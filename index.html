@@ -2183,10 +2183,34 @@ async function unlockAllAudio(){
   if (audioMagic)   audioMagic.volume   = MAGIC_VOLUME;
   if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
 }
+// ✅ 只允許點「指定按鈕」才解鎖音訊（點空白不解鎖）
+(function setupAudioUnlockGate(){
+  const ALLOW_SELECTORS = [
+    "#btnStart",
+    "#btnNext",
+    "#btnPrev",
+    "#btnReset",
+    "#splashStart",
+    ".round-jump-btn"   // 若你希望「跳回合」按鈕也能解鎖就留著
+    // 注意：不要放 #splashLater，避免按「稍後再播」也解鎖
+  ].join(",");
 
-// 額外保險：任何第一次觸碰都解鎖（不影響桌機）
-document.addEventListener("touchstart", () => { unlockAllAudio(); }, { once:true, passive:true });
-document.addEventListener("pointerdown", () => { unlockAllAudio(); }, { once:true, passive:true });
+  const handler = (ev) => {
+    if (audioUnlocked) return;
+
+    const t = ev.target;
+    if (!(t instanceof Element)) return;
+
+    // ✅ 不是點到指定按鈕（含按鈕內的子元素）→ 不解鎖
+    if (!t.closest(ALLOW_SELECTORS)) return;
+
+    unlockAllAudio(); // 不用 await，避免卡住按鈕流程
+  };
+
+  document.addEventListener("pointerdown", handler, { capture:true, passive:true });
+  document.addEventListener("touchstart",  handler, { capture:true, passive:true });
+})();
+
 
 // 目前的主 BGM： "normal" | "nervous" | "finish" | null
 let currentMainBgm = null;
