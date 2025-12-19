@@ -2114,6 +2114,51 @@ const audioMagic   = document.getElementById("bgm-magic");
 const audioNervous = document.getElementById("bgm-nervous");
 const audioCelebrate = document.getElementById("bgm-celebrate");
 const audioFinish  = document.getElementById("bgm-finish");
+// ✅ iOS/Safari/部分瀏覽器需要：第一次使用者點擊時，把所有音軌「解鎖」
+// 解鎖後，後續在任何 async 流程呼叫 audio.play() 才會穩定成功
+let audioUnlocked = false;
+
+async function unlockAllAudio(){
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  const list = [audioNormal, audioMagic, audioNervous, audioCelebrate, audioFinish].filter(Boolean);
+
+  // 用「靜音播放一下又立刻停」來解鎖
+  // （靜音播放通常不會被擋，且不會吵到使用者）
+  for (const a of list){
+    try {
+      a.muted = true;
+      a.volume = 0;        // 雙保險
+      a.currentTime = 0;
+
+      // 有些瀏覽器需要真的 play() 才算解鎖
+      await a.play();
+
+      a.pause();
+      a.currentTime = 0;
+
+      a.muted = false;
+      // 你後面會再把 volume 設回基準值，這裡先不強行改回也行
+    } catch (e){
+      // 就算某個失敗也不要中斷，繼續解鎖下一個
+      console.warn("unlock audio failed:", a?.id, e);
+      try {
+        a.pause();
+        a.currentTime = 0;
+        a.muted = false;
+      } catch(_){}
+    }
+  }
+
+  // 解鎖完後，把 BGM 音量恢復成你設定的基準
+  if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
+  if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
+  if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
+  if (audioMagic)   audioMagic.volume   = MAGIC_VOLUME;
+  if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
+}
+
 
 // ★ 統一管理音量（可以之後自己微調數字）
 const BGM_VOLUME_BASE   = 0.7;  // BGM 原本音量（normal / nervous / finish）
@@ -4059,6 +4104,8 @@ state.finishOrder = [];   // 🔹 清掉通關順序
     async function celebrateFinish(playerId){
   if (fastMode) return;
   // ✅ 重要：冠軍慶祝期間，先停掉所有主 BGM（normal / nervous / finish）
+  if (celebratePlayed) return;
+  celebratePlayed = true;
   stopAllMainBgm();
   currentMainBgm = null;
 
@@ -4138,11 +4185,12 @@ if (winnerBannerEl){
     // ====== 事件綁定 ======
 
 // ▶ 主播放按鈕：開始自動播放 + 啟動常駐 BGM
-btnStart.addEventListener("click", ()=> {
-  // 第一次開始播放時，切到一般 BGM
-  playMainBgm("normal");
+btnStart.addEventListener("click", async ()=> {
+  await unlockAllAudio();          // ✅ 先解鎖所有音軌
+  await playMainBgm("normal");     // ✅ 再開始播 normal
   runAuto();
 });
+
 
 // ▶ 單步前進 / 後退：只控制動畫，不動音樂
 btnNext.addEventListener("click", ()=> runNext());
@@ -4156,6 +4204,7 @@ btnReset.addEventListener("click", ()=> {
   finishStarted  = false;
   rivalryStarted = false;
   rivalryEnded   = false;
+  celebratePlayed = false;
 
   // 重設賽道與動畫狀態
   resetAll();
@@ -4174,12 +4223,14 @@ speedEl.addEventListener("input", ()=>{
 // ▶ 從開場畫面直接開始播放
 splashStart.addEventListener("click", async ()=> {
   splash.style.display = "none";
-requestFitStage();
-  // 一樣先啟動一般 BGM
-  playMainBgm("normal");
+  requestFitStage();
+
+  await unlockAllAudio();          // ✅ 先解鎖
+  await playMainBgm("normal");     // ✅ 再播 normal
 
   await runAuto();
 });
+
 
 // ▶ 只關閉開場畫面，不播放（這裡不動音樂）
 splashLater.addEventListener("click", ()=> {
@@ -4204,3 +4255,4 @@ splashLater.addEventListener("click", ()=> {
   </div>
 </body>
 </html>
+
