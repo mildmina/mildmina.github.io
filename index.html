@@ -1885,7 +1885,7 @@ animation: winnerGlow 2200ms ease-in-out infinite;
 <audio id="bgm-normal"  src="music/normal.mp3"  preload="auto" loop></audio>
 
 <!-- 魔法特效用 -->
-<audio id="bgm-magic"   src="music/magic.mp3"   preload="metadata"></audio>
+<audio id="bgm-magic"   src="music/magic.mp3"   preload="auto"></audio>
 
 <!-- 緊張 BGM（38 格之後） -->
 <audio id="bgm-nervous" src="music/nervous.mp3" preload="metadata" loop></audio>
@@ -2255,6 +2255,13 @@ function unlockAllAudio(){
 
 // 目前的主 BGM： "normal" | "nervous" | "finish" | null
 let currentMainBgm = null;
+function getMainAudio(){
+  if (currentMainBgm === "normal")  return audioNormal;
+  if (currentMainBgm === "nervous") return audioNervous;
+  if (currentMainBgm === "finish")  return audioFinish;
+  return null;
+}
+
 // 是否正在播放魔法音效
 let magicPlaying   = false;
 
@@ -2308,47 +2315,81 @@ let fastMode = false;
 function playMagicOnce(){
   if (fastMode || !audioMagic) return Promise.resolve();
 
-  magicPlaying = true;
+  // ✅ 確保已解鎖（避免某些手機延遲播放被判定非手勢觸發）
+  const ensureUnlocked = audioUnlocked ? Promise.resolve() : unlockAllAudio();
 
-  if (audioNormal)  audioNormal.volume  = BGM_VOLUME_DIMMED;
-  if (audioNervous) audioNervous.volume = BGM_VOLUME_DIMMED;
-  if (audioFinish)  audioFinish.volume  = BGM_VOLUME_DIMMED;
+  return ensureUnlocked.then(() => {
+    magicPlaying = true;
 
-  stopAudio(audioMagic);
-  audioMagic.volume = MAGIC_VOLUME;
+    // 先把主 BGM 音量壓低
+    if (audioNormal)  audioNormal.volume  = BGM_VOLUME_DIMMED;
+    if (audioNervous) audioNervous.volume = BGM_VOLUME_DIMMED;
+    if (audioFinish)  audioFinish.volume  = BGM_VOLUME_DIMMED;
 
-  return new Promise(resolve => {
-    let done = false;
-    const MAX_MS = 3000;
-    let timer = null;
+    // ✅ 確保 magic 本身不是靜音、音量正確
+    try { audioMagic.muted = false; } catch(_){}
+    audioMagic.volume = MAGIC_VOLUME;
 
-    function finish(){
-      if (done) return;
-      done = true;
-      if (timer !== null){ clearTimeout(timer); timer = null; }
+    // ✅ 重播從 0 開始
+    try { audioMagic.pause(); } catch(_){}
+    try { audioMagic.currentTime = 0; } catch(_){}
 
-      stopAudio(audioMagic);
-      audioMagic.onended = null;
+    const main = getMainAudio();
+    const mainWasPlaying = !!main && !main.paused;
 
-      magicPlaying = false;
+    return new Promise(resolve => {
+      let done = false;
+      const MAX_MS = 3000;
+      let timer = null;
 
-      if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
-      if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
-      if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
+      function cleanup(){
+        if (done) return;
+        done = true;
 
-      resolve();
-    }
+        if (timer) { clearTimeout(timer); timer = null; }
 
-    timer = setTimeout(finish, MAX_MS);
+        try { audioMagic.pause(); } catch(_){}
+        try { audioMagic.currentTime = 0; } catch(_){}
+        audioMagic.onended = null;
 
-    audioMagic.play().catch(e=>{
-      console.warn("magic play error:", e);
-      finish();
+        magicPlaying = false;
+
+        if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
+        if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
+        if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
+
+        resolve();
+      }
+
+      timer = setTimeout(cleanup, MAX_MS);
+
+      // ✅ 先綁 onended（有些手機很挑順序）
+      audioMagic.onended = () => cleanup();
+
+      audioMagic.play().catch(e => {
+        console.warn("magic play error:", e);
+
+        // ✅ 手機常見：BGM 正在播會吃掉短音效 → 暫停 BGM 再試一次
+        if (main && mainWasPlaying){
+          try { main.pause(); } catch(_){}
+
+          Promise.resolve()
+            .then(() => audioMagic.play())
+            .catch(e2 => console.warn("magic retry failed:", e2))
+            .finally(() => {
+              Promise.resolve()
+                .then(() => main.play())
+                .catch(()=>{});
+            });
+
+        } else {
+          cleanup();
+        }
+      });
     });
-
-    audioMagic.onended = () => finish();
   });
 }
+
 
 // ====== celebrate：不加速，只播 0~7 秒（加「超時保險」避免 iOS 卡住）=====
 function playCelebrate7sOnce(){
