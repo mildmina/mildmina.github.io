@@ -27,8 +27,10 @@
       background: radial-gradient(900px 500px at 10% 10%, #ffffff 0%, #f2f7ff 60%);
       color: var(--text);
       -webkit-font-smoothing:antialiased;
-      height: 100vh;     /* ✅ 新增：讓畫面以視窗高度為準 */
-  overflow: hidden;  /* ✅ 新增：避免手機出現左右滾動條 */
+      /* ✅ 只關掉左右捲軸；保留上下捲動（手機才看得到後面的賽道） */
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
     }
 
 
@@ -39,19 +41,22 @@
   padding: 14px 24px;  /* 保留一點邊距就好，可自行調整 */
 }
 .viewport{
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  min-height: 100vh;
   display:flex;
-  align-items:center;
   justify-content:center;
-  overflow:hidden;
+  align-items:flex-start;
+  overflow-x:hidden;
+  overflow-y:auto;
 }
 
+
 #stage{
-  width: 1400px;   /* 先用這組，之後可微調 */
-  height: 900px;
-  transform-origin: center center;
+  width: 100%;
+  max-width: 1400px;   /* 桌機置中 */
+  margin: 0 auto;
 }
+
 
 /* ✅ 電腦版：讓舞台永遠水平置中，並且不要超出視窗 */
 @media (min-width: 1101px){
@@ -2365,24 +2370,10 @@ const viewportEl = document.querySelector(".viewport");
 const stageRootEl = document.getElementById("stage");
 
 function fitStage(){
-  if (!stageRootEl) return;
-
-  // 先清掉 transform 才能量到原始尺寸
+  // ✅ 不再用 transform 縮放整個舞台（iOS 會讓捲動/高度計算怪怪的）
+  stageRootEl.style.transformOrigin = "top left";
   stageRootEl.style.transform = "none";
-
-  const rect = stageRootEl.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  if (!rect.width || !rect.height) return;
-
-  // 只縮小不放大：桌機維持 1，手機才會縮小塞進去
-  const scale = Math.min(1, Math.min(vw / rect.width, vh / rect.height));
-
-  // 置中交給 .viewport 的 flex，這裡只做縮放
-  stageRootEl.style.transformOrigin = "center center";
-  stageRootEl.style.transform = `scale(${scale})`;
 }
-
 
 // 視窗變動時重算（resize / 旋轉）
 let fitTimer = null;
@@ -4255,3 +4246,4 @@ splashLater.addEventListener("click", ()=> {
   </div>
 </body>
 </html>
+
