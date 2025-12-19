@@ -2172,7 +2172,8 @@ async function playMainBgm(kind){
 
   if (target){
     // 確保 BGM 用的是「原本基準音量」
-    target.volume = BGM_VOLUME_BASE;
+    target.volume = magicPlaying ? BGM_VOLUME_DIMMED : BGM_VOLUME_BASE;
+
 
     try {
       await target.play();
@@ -2850,56 +2851,13 @@ function checkRaceMusicTriggers(){
 
     // nervous BGM 只啟動一次
     if (!nervousStarted){
-      nervousStarted = true;
-      // 若要用壓縮版 nervous BGM，就換成 playNervousCompressed()
-      playNervousCompressed();
-      // 或如果你想用完整版本，就改成：
-      // playMainBgm("nervous");
-    }
+  nervousStarted = true;
+  playMainBgm("nervous");   // ✅ 緊張 BGM 進入後一路 loop 到 46
+}
   }
 
   // 其他情況就維持原本 BGM（normal 或 nervous），不特別處理
 }
-
-// ====== nervous：只播 0~32 秒，並在 27.91 秒內播完 ======
-async function playNervousCompressed(){
-  // fastMode 或沒有音檔：直接略過
-  if (fastMode || !audioNervous) return;
-
-  // 先停掉所有主 BGM，避免疊音
-  stopAllMainBgm();
-  currentMainBgm = "nervous";
-
-  const FROM_SEC = 0;
-  const TO_SEC   = 32;
-  const PLAY_MS  = 32000; // 27.91 秒
-
-  const rate = (TO_SEC - FROM_SEC) / (PLAY_MS / 1000); // 32 / 32
-
-  // 設回基準音量
-  audioNervous.volume = BGM_VOLUME_BASE;
-
-  // 從頭開始
-  stopAudio(audioNervous);
-  audioNervous.currentTime  = FROM_SEC;
-  audioNervous.playbackRate = rate;
-
-  try {
-    await audioNervous.play();
-  } catch (e){
-    console.warn("nervous play error:", e);
-    return;
-  }
-
-  // 強制在 27.91 秒結束（並歸零），確保不會播到 32 秒以後
-  setTimeout(() => {
-    // 只有還在播 nervous 才停（避免你之後切到別的 BGM 又被停掉）
-    if (currentMainBgm === "nervous") {
-      stopAudio(audioNervous);
-    }
-  }, PLAY_MS);
-}
-
 
     // ====== 建立右側「回合快速跳轉」按鈕 ======
     function buildRoundJumpButtons(){
@@ -4246,4 +4204,3 @@ splashLater.addEventListener("click", ()=> {
   </div>
 </body>
 </html>
-
