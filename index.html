@@ -1898,215 +1898,241 @@ animation: winnerGlow 2200ms ease-in-out infinite;
 
 
   <script>
-    // ====== 基本設定 ======
-    const TRACK_CELLS = 90;  // 賽道邏輯上最大格數（顯示用）
-    const FINISH = 46;       // 冠軍終點
+/* ===============================
+   手機版卡死修正版（可直接覆蓋）
+   - 修正 btnNext/btnPrev 綁定語法
+   - 手機版降低煙火/噴星星粒子量，避免 iOS/Android 卡死
+================================ */
 
-    const players = [
-      { id:"crane",     name:"丹頂鶴", img:"animals/crane.png" },
-      { id:"monkey",    name:"小猴",   img:"animals/monkey.png" },
-      { id:"parrot",    name:"鸚鵡",   img:"animals/parrot.png" },
-      { id:"meerkat",   name:"狐獴",   img:"animals/meerkat.png" },
-      { id:"porcupine", name:"豪豬",   img:"animals/porcupine.png" },
-      { id:"capybara",  name:"水豚",   img:"animals/capybara.png" },
-      { id:"ape",       name:"人猿",   img:"animals/ape.png" },
-      { id:"seal",      name:"海豹",   img:"animals/seal.png" },
-      { id:"crocodile", name:"鱷魚",   img:"animals/crocodile.png" },
-      { id:"moose",     name:"麋鹿",   img:"animals/moose.png" },
-      { id:"camel",     name:"駱駝",   img:"animals/camel.png" },
-      { id:"raccoon",   name:"浣熊",   img:"animals/raccoon.png" },
-      { id:"bear",      name:"小熊",   img:"animals/bear.png" },
-      { id:"sloth",     name:"樹懶",   img:"animals/sloth.png" },
-      { id:"pigeon",    name:"鴿子",   img:"animals/pigeon.png" },
-      { id:"baboon",    name:"狒狒",   img:"animals/baboon.png" },
-      { id:"otter",     name:"水獺",   img:"animals/otter.png" },
-      { id:"tiger",     name:"老虎",   img:"animals/tiger.png" },
-      { id:"peacock",   name:"孔雀",   img:"animals/peacock.png" },
-    ];
+// ====== 基本設定 ======
+const TRACK_CELLS = 90;  // 賽道邏輯上最大格數（顯示用）
+const FINISH = 46;       // 冠軍終點
 
-    // === 回合資料（1~10 回合） ===
-    const rounds = [
+// ✅ 裝置/效能判斷（用來降載特效）
+const IS_MOBILE = window.matchMedia("(max-width: 820px)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const PREFERS_REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ✅ 粒子/特效負載配置（手機版縮小）
+const FX_CFG = {
+  // 冠軍煙火
+  fireworksInterval: IS_MOBILE ? 520 : 320,
+  fireworksTotalMs: 7000, // 你原本的 7 秒
+  // 煙火每波粒子數（手機版縮小）
+  fwLayers: IS_MOBILE
+    ? [
+        { name:"big",   count:10, sz:[7,10],  dist:[70,110],  dur:[1000,1400], z:98 },
+        { name:"mid",   count:14, sz:[5,7],   dist:[55,90],   dur:[850,1200],  z:97 },
+        { name:"small", count:18, sz:[3,5],   dist:[30,65],   dur:[700,1000],  z:96 },
+      ]
+    : [
+        { name:"big",   count:18, sz:[8,12],  dist:[90,140],  dur:[1100,1500], z:98 },
+        { name:"mid",   count:26, sz:[5,8],   dist:[60,110],  dur:[900,1300],  z:97 },
+        { name:"small", count:34, sz:[3,6],   dist:[35,80],   dur:[750,1100],  z:96 },
+      ],
+  // 冠軍賽道噴星星（手機版縮小）
+  winnerBurstCount: IS_MOBILE ? 18 : 42,
+  winnerBurstInterval: IS_MOBILE ? 2200 : 1600,
+};
+
+const players = [
+  { id:"crane",     name:"丹頂鶴", img:"animals/crane.png" },
+  { id:"monkey",    name:"小猴",   img:"animals/monkey.png" },
+  { id:"parrot",    name:"鸚鵡",   img:"animals/parrot.png" },
+  { id:"meerkat",   name:"狐獴",   img:"animals/meerkat.png" },
+  { id:"porcupine", name:"豪豬",   img:"animals/porcupine.png" },
+  { id:"capybara",  name:"水豚",   img:"animals/capybara.png" },
+  { id:"ape",       name:"人猿",   img:"animals/ape.png" },
+  { id:"seal",      name:"海豹",   img:"animals/seal.png" },
+  { id:"crocodile", name:"鱷魚",   img:"animals/crocodile.png" },
+  { id:"moose",     name:"麋鹿",   img:"animals/moose.png" },
+  { id:"camel",     name:"駱駝",   img:"animals/camel.png" },
+  { id:"raccoon",   name:"浣熊",   img:"animals/raccoon.png" },
+  { id:"bear",      name:"小熊",   img:"animals/bear.png" },
+  { id:"sloth",     name:"樹懶",   img:"animals/sloth.png" },
+  { id:"pigeon",    name:"鴿子",   img:"animals/pigeon.png" },
+  { id:"baboon",    name:"狒狒",   img:"animals/baboon.png" },
+  { id:"otter",     name:"水獺",   img:"animals/otter.png" },
+  { id:"tiger",     name:"老虎",   img:"animals/tiger.png" },
+  { id:"peacock",   name:"孔雀",   img:"animals/peacock.png" },
+];
+
+// === 回合資料（1~10 回合） ===
+const rounds = [
+  {
+    round: 1, title: "日常積分",
+    groupEvents: [
+      { date: "10/7",  item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
+      { date: "10/10", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: []
+  },
+  {
+    round: 2, title: "日常積分",
+    groupEvents: [
+      { date: "10/13", item: "手部塗抹檢查", type: "allExcept", except: ["pigeon"], points: 1, note: "鴿子停留 +0，其餘 +1" },
+      { date: "10/17", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: []
+  },
+  {
+    round: 3, title: "不定期積分",
+    groupEvents: [
+      { date: "10/23", item: "手部塗抹檢查", type: "allExcept", except: ["moose"], points: 1, note: "麋鹿停留 +0，其餘 +1" },
+      { date: "10/24", item: "交叉巡檢改善單", type: "only", only: ["porcupine","capybara","ape","seal","crocodile","moose","camel"], points: 2, note: "3日內回覆 +2" },
+      { date: "10/24", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: []
+  },
+  {
+    round: 4, title: "不定期積分",
+    groupEvents: [
+      { date: "10/28", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
+      { date: "10/29", item: "交叉巡檢改善單", type: "only", only: ["raccoon","bear","sloth","pigeon","baboon","otter","tiger","peacock"], points: 1, note: "4-7日內回覆 +1" },
+      { date: "10/31", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: []
+  },
+  {
+    round: 5, title: "日常積分",
+    groupEvents: [
+      { date: "11/4", item: "手部塗抹檢查", type: "allExcept", except: ["crocodile"], points: 1, note: "鱷魚停留 +0，其餘 +1" },
+      { date: "11/7", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: []
+  },
+  {
+    round: 6, title: "額外積分",
+    groupEvents: [
       {
-        round: 1, title: "日常積分",
-        groupEvents: [
-          { date: "10/7",  item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
-          { date: "10/10", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: []
+        date: "11/13",
+        item: "過敏原測驗達標獎",
+        type: "byMap",
+        by: { crane: 2, monkey: 4, parrot: 1, porcupine: 1, capybara: 2, ape: 4, seal: 3, camel: 4, raccoon: 2, pigeon: 4 },
+        note: "達標選手依成績獲得不同步數"
+      },
+      { date: "11/13", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
+      { date: "11/14", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: [
+      { date: "11/13", who: "camel",     reason: "MP2503 審查通過", card: 0, camelBonus: true },
+      { date: "11/13", who: "capybara",  reason: "MP2504 審查通過", card: 4 },
+      { date: "11/13", who: "porcupine", reason: "MP2505 審查通過", card: 6 },
+    ]
+  },
+  {
+    round: 7, title: "日常積分",
+    groupEvents: [
+      { date: "11/17", item: "手部塗抹檢查", type: "allExcept", except: ["seal"], points: 1, note: "海豹除外，其餘 +1" },
+      { date: "11/19", item: "特殊格獎勵", type: "only", only: ["crane","parrot","crocodile","moose","bear","sloth","baboon","otter","tiger","peacock"], points: 1, note: "抵達第13格 +1",fx: "angel" },
+      { date: "11/21", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: [
+      { date: "11/17", who: "crane",   reason: "MP2507 審查通過", card: 6 },
+      { date: "11/18", who: "peacock", reason: "MP2508 審查通過", card: 1 },
+    ]
+  },
+  {
+    round: 8, title: "不定期積分",
+    groupEvents: [
+      { date: "11/25", item: "交叉巡檢改善單", type: "allExcept", except: ["meerkat"], points: 2, note: "3日內回覆 +2（狐獴除外）" },
+      { date: "11/25", item: "手部塗抹檢查", type: "allExcept", except: ["otter"], points: 1, note: "水獺停留 +0，其餘 +1" },
+      { date: "11/28", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+    ],
+    soloEvents: [
+      { date: "11/24", who: "ape",     reason: "MP2510 審查通過", card: 3 },
+      { date: "11/28", who: "meerkat", reason: "交叉巡檢改善單4-7日內回覆", card: 1 },
+    ]
+  },
+
+  {
+    round: 9,
+    title: "額外積分",
+    groupEvents: [
+      {
+        date: "12/2",
+        item: "GHP測驗達標獎勵",
+        type: "byMap",
+        by: {
+          crane: 10, monkey: 10, parrot: 2, porcupine: 11, capybara: 10,
+          ape: 9, seal: 3, moose: 5, camel: 10, raccoon: 3,
+          sloth: 2, pigeon: 5, baboon: 4, otter: 6, peacock: 10
+        },
+        note: "達標選手依成績獲得不同步數"
       },
       {
-        round: 2, title: "日常積分",
-        groupEvents: [
-          { date: "10/13", item: "手部塗抹檢查", type: "allExcept", except: ["pigeon"], points: 1, note: "鴿子停留 +0，其餘 +1" },
-          { date: "10/17", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: []
+        date: "12/3",
+        item: "特殊格獎勵",
+        type: "only",
+        only: ["peacock"],
+        points: 1,
+        note: "抵達31格 +1",
+        fx: "angel"
+      },
+      { date: "12/5", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
+      { date: "12/5", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+      { date: "12/8", item: "每週任務分數加倍", type: "allExcept", except: ["peacock"], points: 2, note: "孔雀停留 +0，其餘 +2" },
+      {
+        date: "12/10",
+        item: "自主提案人獎勵",
+        type: "byMap",
+        by: { crane: 10, monkey: 12, parrot: 1, porcupine: 9, capybara: 1, ape: 23, seal: 1, camel: 6, raccoon: 1, peacock: 7 },
+        note: "提案人依獎勵獲得不同步數"
+      },
+    ],
+    soloEvents: [
+      { date: "12/1", who: "crane",   reason: "MP2514 審查通過", card: 2 },
+      { date: "12/1", who: "parrot",  reason: "MP2515 審查通過", card: 5 },
+
+      { date: "12/3", who: "ape",       reason: "MP2516 審查通過", card: 3 },
+      { date: "12/3", who: "ape",       reason: "MP2517 審查通過", card: 5 },
+      { date: "12/3", who: "porcupine", reason: "MP2518 審查通過", card: 6 },
+      { date: "12/3", who: "monkey",    reason: "MP2519 審查通過", card: 6 },
+
+      { date: "12/4", who: "camel",     reason: "MP2503 前進卡（使用）", card: 4, camelUse: true },
+      { date: "12/4", who: "monkey",    reason: "MP2520 審查通過", card: 3 },
+      { date: "12/4", who: "monkey",    reason: "MP2521 審查通過", card: 4 },
+      { date: "12/4", who: "ape",       reason: "MP2522 審查通過", card: 2 },
+      { date: "12/4", who: "monkey",    reason: "MP2524 審查通過", card: 2 },
+
+      { date: "12/5", who: "ape",       reason: "MP2527 審查通過", card: 4 },
+      { date: "12/5", who: "porcupine", reason: "MP2528 審查通過", card: 5 },
+      { date: "12/5", who: "ape",       reason: "MP2529 審查通過", card: 2 },
+      { date: "12/5", who: "crane",     reason: "MP2530 審查通過", card: 2 },
+    ]
+  },
+
+  {
+    round: 10,
+    title: "日常＋額外積分",
+    groupEvents: [
+      { date: "12/12", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
+      { date: "12/12", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
+      { date: "12/15", item: "每週任務分數加倍", type: "all", points: 2, note: "全體通過 +2" },
+      {
+        date: "12/10",
+        item: "特殊格獎勵",
+        type: "only",
+        only: ["pigeon"],
+        points: 1,
+        note: "抵達31格 +1",
+        fx: "angel"
       },
       {
-        round: 3, title: "不定期積分",
-        groupEvents: [
-          { date: "10/23", item: "手部塗抹檢查", type: "allExcept", except: ["moose"], points: 1, note: "麋鹿停留 +0，其餘 +1" },
-          { date: "10/24", item: "交叉巡檢改善單", type: "only", only: ["porcupine","capybara","ape","seal","crocodile","moose","camel"], points: 2, note: "3日內回覆 +2" },
-          { date: "10/24", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: []
+        date: "12/16",
+        item: "自主提案人獎勵",
+        type: "byMap",
+        by: { monkey: 2, camel: 4, pigeon: 9 },
+        note: "提案人依獎勵獲得不同步數"
       },
-      {
-        round: 4, title: "不定期積分",
-        groupEvents: [
-          { date: "10/28", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
-          { date: "10/29", item: "交叉巡檢改善單", type: "only", only: ["raccoon","bear","sloth","pigeon","baboon","otter","tiger","peacock"], points: 1, note: "4-7日內回覆 +1" },
-          { date: "10/31", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: []
-      },
-      {
-        round: 5, title: "日常積分",
-        groupEvents: [
-          { date: "11/4", item: "手部塗抹檢查", type: "allExcept", except: ["crocodile"], points: 1, note: "鱷魚停留 +0，其餘 +1" },
-          { date: "11/7", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: []
-      },
-      {
-        round: 6, title: "額外積分",
-        groupEvents: [
-          {
-            date: "11/13",
-            item: "過敏原測驗達標獎",
-            type: "byMap",
-            by: { crane: 2, monkey: 4, parrot: 1, porcupine: 1, capybara: 2, ape: 4, seal: 3, camel: 4, raccoon: 2, pigeon: 4 },
-            note: "達標選手依成績獲得不同步數"
-          },
-          { date: "11/13", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
-          { date: "11/14", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: [
-          { date: "11/13", who: "camel",     reason: "MP2503 審查通過", card: 0, camelBonus: true },
-          { date: "11/13", who: "capybara",  reason: "MP2504 審查通過", card: 4 },
-          { date: "11/13", who: "porcupine", reason: "MP2505 審查通過", card: 6 },
-        ]
-      },
-      {
-        round: 7, title: "日常積分",
-        groupEvents: [
-          { date: "11/17", item: "手部塗抹檢查", type: "allExcept", except: ["seal"], points: 1, note: "海豹除外，其餘 +1" },
-          { date: "11/19", item: "特殊格獎勵", type: "only", only: ["crane","parrot","crocodile","moose","bear","sloth","baboon","otter","tiger","peacock"], points: 1, note: "抵達第13格 +1",fx: "angel" },
-          { date: "11/21", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: [
-          { date: "11/17", who: "crane",   reason: "MP2507 審查通過", card: 6 },
-          { date: "11/18", who: "peacock", reason: "MP2508 審查通過", card: 1 },
-        ]
-      },
-      {
-        round: 8, title: "不定期積分",
-        groupEvents: [
-          { date: "11/25", item: "交叉巡檢改善單", type: "allExcept", except: ["meerkat"], points: 2, note: "3日內回覆 +2（狐獴除外）" },
-          { date: "11/25", item: "手部塗抹檢查", type: "allExcept", except: ["otter"], points: 1, note: "水獺停留 +0，其餘 +1" },
-          { date: "11/28", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-        ],
-        soloEvents: [
-          { date: "11/24", who: "ape",     reason: "MP2510 審查通過", card: 3 },
-          { date: "11/28", who: "meerkat", reason: "交叉巡檢改善單4-7日內回覆", card: 1 },
-        ]
-      },
-
-        {
-  round: 9,
-  title: "額外積分",
-  groupEvents: [
-    {
-      date: "12/2",
-      item: "GHP測驗達標獎勵",
-      type: "byMap",
-      by: {
-        crane: 10, monkey: 10, parrot: 2, porcupine: 11, capybara: 10,
-        ape: 9, seal: 3, moose: 5, camel: 10, raccoon: 3,
-        sloth: 2, pigeon: 5, baboon: 4, otter: 6, peacock: 10
-      },
-      note: "達標選手依成績獲得不同步數"
-    },
-    {
-      date: "12/3",
-      item: "特殊格獎勵",
-      type: "only",
-      only: ["peacock"],
-      points: 1,
-      note: "抵達31格 +1",
-      fx: "angel"
-    },
-    { date: "12/5", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
-    { date: "12/5", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-    { date: "12/8", item: "每週任務分數加倍", type: "allExcept", except: ["peacock"], points: 2, note: "孔雀停留 +0，其餘 +2" },
-    {
-      date: "12/10",
-      item: "自主提案人獎勵",
-      type: "byMap",
-      by: { crane: 10, monkey: 12, parrot: 1, porcupine: 9, capybara: 1, ape: 23, seal: 1, camel: 6, raccoon: 1, peacock: 7 },
-      note: "提案人依獎勵獲得不同步數"
-    },
-  ],
-
-  soloEvents: [
-    { date: "12/1", who: "crane",   reason: "MP2514 審查通過", card: 2 },
-    { date: "12/1", who: "parrot",  reason: "MP2515 審查通過", card: 5 },
-
-    { date: "12/3", who: "ape",       reason: "MP2516 審查通過", card: 3 },
-    { date: "12/3", who: "ape",       reason: "MP2517 審查通過", card: 5 },
-    { date: "12/3", who: "porcupine", reason: "MP2518 審查通過", card: 6 },
-    { date: "12/3", who: "monkey",    reason: "MP2519 審查通過", card: 6 },
-
-    { date: "12/4", who: "camel",     reason: "MP2503 前進卡（使用）", card: 4, camelUse: true },
-    { date: "12/4", who: "monkey",    reason: "MP2520 審查通過", card: 3 },
-    { date: "12/4", who: "monkey",    reason: "MP2521 審查通過", card: 4 },
-    { date: "12/4", who: "ape",       reason: "MP2522 審查通過", card: 2 },
-    { date: "12/4", who: "monkey",    reason: "MP2524 審查通過", card: 2 },
-
-    { date: "12/5", who: "ape",       reason: "MP2527 審查通過", card: 4 },
-    { date: "12/5", who: "porcupine", reason: "MP2528 審查通過", card: 5 },
-    { date: "12/5", who: "ape",       reason: "MP2529 審查通過", card: 2 },
-    { date: "12/5", who: "crane",     reason: "MP2530 審查通過", card: 2 },
-  ]
-},
-
-{
-  round: 10,
-  title: "日常＋額外積分",
-  groupEvents: [
-    // 日常
-    { date: "12/12", item: "手部塗抹檢查", type: "all", points: 1, note: "全體通過 +1" },
-    { date: "12/12", item: "服裝儀容檢查", type: "all", points: 1, note: "全體通過 +1" },
-    { date: "12/15", item: "每週任務分數加倍", type: "all", points: 2, note: "全體通過 +2" },
-
-    // 額外
-    {
-      date: "12/10",
-      item: "特殊格獎勵",
-      type: "only",
-      only: ["pigeon"],
-      points: 1,
-      note: "抵達31格 +1",
-      fx: "angel"
-    },
-    {
-      date: "12/16",
-      item: "自主提案人獎勵",
-      type: "byMap",
-      by: { monkey: 2, camel: 4, pigeon: 9 },
-      note: "提案人依獎勵獲得不同步數"
-    },
-    { date: "12/16", item: "主辦單位獎勵", type: "all", points: 5, note: "感謝大家積極參與!" },
-  ],
-
-  soloEvents: [
-    { date: "12/11", who: "monkey",  reason: "MP2535 審查通過", card: 2 },
-    { date: "12/12", who: "pigeon",  reason: "MP2538 審查通過", card: 6 },
-    { date: "12/12", who: "pigeon",  reason: "MP2541 審查通過", card: 2 },
-  ]
-}
-
-    ];
+      { date: "12/16", item: "主辦單位獎勵", type: "all", points: 5, note: "感謝大家積極參與!" },
+    ],
+    soloEvents: [
+      { date: "12/11", who: "monkey",  reason: "MP2535 審查通過", card: 2 },
+      { date: "12/12", who: "pigeon",  reason: "MP2538 審查通過", card: 6 },
+      { date: "12/12", who: "pigeon",  reason: "MP2541 審查通過", card: 2 },
+    ]
+  }
+];
 
 // ====== 音效控制 ======
 const audioNormal  = document.getElementById("bgm-normal");
@@ -2114,8 +2140,20 @@ const audioMagic   = document.getElementById("bgm-magic");
 const audioNervous = document.getElementById("bgm-nervous");
 const audioCelebrate = document.getElementById("bgm-celebrate");
 const audioFinish  = document.getElementById("bgm-finish");
-// ✅ iOS/Safari/部分瀏覽器需要：第一次使用者點擊時，把所有音軌「解鎖」
-// 解鎖後，後續在任何 async 流程呼叫 audio.play() 才會穩定成功
+
+// ★ 統一管理音量（可以之後自己微調數字）
+const BGM_VOLUME_BASE   = 0.7;
+const BGM_VOLUME_DIMMED = 0.45;
+const MAGIC_VOLUME      = 1.0;
+
+// 初始化音量
+if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
+if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
+if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
+if (audioMagic)   audioMagic.volume   = MAGIC_VOLUME;
+if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
+
+// ✅ iOS/Safari 需要：第一次互動解鎖音軌
 let audioUnlocked = false;
 
 async function unlockAllAudio(){
@@ -2124,34 +2162,21 @@ async function unlockAllAudio(){
 
   const list = [audioNormal, audioMagic, audioNervous, audioCelebrate, audioFinish].filter(Boolean);
 
-  // 用「靜音播放一下又立刻停」來解鎖
-  // （靜音播放通常不會被擋，且不會吵到使用者）
   for (const a of list){
     try {
       a.muted = true;
-      a.volume = 0;        // 雙保險
+      a.volume = 0;
       a.currentTime = 0;
-
-      // 有些瀏覽器需要真的 play() 才算解鎖
       await a.play();
-
       a.pause();
       a.currentTime = 0;
-
       a.muted = false;
-      // 你後面會再把 volume 設回基準值，這裡先不強行改回也行
     } catch (e){
-      // 就算某個失敗也不要中斷，繼續解鎖下一個
       console.warn("unlock audio failed:", a?.id, e);
-      try {
-        a.pause();
-        a.currentTime = 0;
-        a.muted = false;
-      } catch(_){}
+      try { a.pause(); a.currentTime = 0; a.muted = false; } catch(_){}
     }
   }
 
-  // 解鎖完後，把 BGM 音量恢復成你設定的基準
   if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
   if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
   if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
@@ -2159,18 +2184,9 @@ async function unlockAllAudio(){
   if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
 }
 
-
-// ★ 統一管理音量（可以之後自己微調數字）
-const BGM_VOLUME_BASE   = 0.7;  // BGM 原本音量（normal / nervous / finish）
-const BGM_VOLUME_DIMMED = 0.45; // 播魔法音效時，BGM 稍微壓低
-const MAGIC_VOLUME      = 1.0;  // 魔法音效音量
-
-// 初始化音量
-if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
-if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
-if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
-if (audioMagic)   audioMagic.volume   = MAGIC_VOLUME;
-if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
+// 額外保險：任何第一次觸碰都解鎖（不影響桌機）
+document.addEventListener("touchstart", () => { unlockAllAudio(); }, { once:true, passive:true });
+document.addEventListener("pointerdown", () => { unlockAllAudio(); }, { once:true, passive:true });
 
 // 目前的主 BGM： "normal" | "nervous" | "finish" | null
 let currentMainBgm = null;
@@ -2180,21 +2196,18 @@ let magicPlaying   = false;
 // ⭐ 這兩個是「38 格緊張 BGM」跟「46 格終點 BGM」有沒有啟動過
 let nervousStarted = false;
 let finishStarted  = false;
+
 // ====== 38~46 競速效果控制 ======
-let rivalryStarted = false; // 第一次有人到 38 才會變 true（只啟動一次）
-let rivalryEnded   = false; // 第一個到 46 後變 true（永遠不再啟動）
+let rivalryStarted = false;
+let rivalryEnded   = false;
 
-
-let nervousAt = null;  // 第一次進入 38 格以上的時間
-let finishAt  = null;  // 第一次進入 46 格以上的時間
-
-let celebratePlayed = false;  // ✅ 冠軍慶祝只跑一次的旗標
+let celebratePlayed = false;
 
 // 小工具：暫停並歸零指定的 audio
 function stopAudio(a){
   if (!a) return;
-  a.pause();
-  try { a.currentTime = 0; } catch(e){}
+  try { a.pause(); } catch(_){}
+  try { a.currentTime = 0; } catch(_){}
 }
 
 // 停掉所有主 BGM
@@ -2204,12 +2217,10 @@ function stopAllMainBgm(){
   stopAudio(audioFinish);
 }
 
-// 播放主 BGM（會記錄目前是哪種）
-// kind: "normal" | "nervous" | "finish" | null
+// 播放主 BGM
 async function playMainBgm(kind){
   currentMainBgm = kind;
 
-  // 不再因為魔法音效而禁止切換 BGM
   stopAllMainBgm();
 
   let target = null;
@@ -2218,56 +2229,44 @@ async function playMainBgm(kind){
   if (kind === "finish")  target = audioFinish;
 
   if (target){
-    // 確保 BGM 用的是「原本基準音量」
+    // loop 保險（若你 HTML 沒設 loop 也能循環）
+    try { target.loop = true; } catch(_){}
     target.volume = magicPlaying ? BGM_VOLUME_DIMMED : BGM_VOLUME_BASE;
 
-
-    try {
-      await target.play();
-    } catch(e){
-      console.warn("BGM play error:", e);
-    }
+    try { await target.play(); }
+    catch(e){ console.warn("BGM play error:", e); }
   }
 }
 
+let fastMode = false;
 
 function playMagicOnce(){
-  // fastMode 或沒有音檔時，直接當作「已完成」
   if (fastMode || !audioMagic) return Promise.resolve();
 
   magicPlaying = true;
 
-  // 播魔法音效前，把三種 BGM 稍微壓低一點音量
   if (audioNormal)  audioNormal.volume  = BGM_VOLUME_DIMMED;
   if (audioNervous) audioNervous.volume = BGM_VOLUME_DIMMED;
   if (audioFinish)  audioFinish.volume  = BGM_VOLUME_DIMMED;
 
-  // 從頭播一次魔法音效
   stopAudio(audioMagic);
   audioMagic.volume = MAGIC_VOLUME;
 
   return new Promise(resolve => {
-    let done   = false;
-    const MAX_MS = 3000;   // ⭐ 最多播放 3 秒
-    let timer  = null;
+    let done = false;
+    const MAX_MS = 3000;
+    let timer = null;
 
     function finish(){
       if (done) return;
       done = true;
+      if (timer !== null){ clearTimeout(timer); timer = null; }
 
-      // 清掉 3 秒計時器
-      if (timer !== null){
-        clearTimeout(timer);
-        timer = null;
-      }
-
-      // ⭐ 強制停止魔法音效
       stopAudio(audioMagic);
       audioMagic.onended = null;
 
       magicPlaying = false;
 
-      // 魔法音效結束後，把 BGM 音量拉回原本基準值
       if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
       if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
       if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
@@ -2275,25 +2274,18 @@ function playMagicOnce(){
       resolve();
     }
 
-    // ⭐ 不管音檔有多長，最多 3 秒就強制結束
-    timer = setTimeout(() => {
-      // console.log("magic bgm force stop after 3s");
-      finish();
-    }, MAX_MS);
+    timer = setTimeout(finish, MAX_MS);
 
     audioMagic.play().catch(e=>{
       console.warn("magic play error:", e);
-      finish();   // 播不出來也當作結束
+      finish();
     });
 
-    // 如果音效本身在 3 秒內就播完，也會走這裡
-    audioMagic.onended = () => {
-      finish();
-    };
+    audioMagic.onended = () => finish();
   });
 }
 
-// ====== celebrate：不加速，只播 0~7 秒 ======
+// ====== celebrate：不加速，只播 0~7 秒（加「超時保險」避免 iOS 卡住）=====
 function playCelebrate7sOnce(){
   if (fastMode || !audioCelebrate) return Promise.resolve();
 
@@ -2301,22 +2293,21 @@ function playCelebrate7sOnce(){
   const TO_SEC   = 7;
   const PLAY_MS  = 7000;
 
-  // 停掉上一段 celebrate，避免疊音
   stopAudio(audioCelebrate);
 
-  // 確保正常速度
   audioCelebrate.playbackRate = 1;
-  audioCelebrate.currentTime  = FROM_SEC;
+  try { audioCelebrate.currentTime  = FROM_SEC; } catch(_){}
 
   return new Promise(resolve => {
     let done  = false;
     let timer = null;
+    let hardTimer = null;
 
     function finish(){
       if (done) return;
       done = true;
-
       if (timer) clearTimeout(timer);
+      if (hardTimer) clearTimeout(hardTimer);
 
       stopAudio(audioCelebrate);
       audioCelebrate.ontimeupdate = null;
@@ -2324,15 +2315,17 @@ function playCelebrate7sOnce(){
       resolve();
     }
 
-    // 七秒到就切
+    // 正常：7 秒到就切
     timer = setTimeout(finish, PLAY_MS);
+
+    // ✅ 超時保險：就算 iOS 不觸發 timeupdate/onended，也最多 8 秒一定放行
+    hardTimer = setTimeout(finish, PLAY_MS + 1000);
 
     audioCelebrate.play().catch(e => {
       console.warn("celebrate play error:", e);
       finish();
     });
 
-    // 保險：如果播放時間跑到 7 秒也切
     audioCelebrate.ontimeupdate = () => {
       if (audioCelebrate.currentTime >= TO_SEC) finish();
     };
@@ -2347,83 +2340,75 @@ function resetBgm(){
   currentMainBgm = null;
   stopAudio(audioMagic);
   stopAudio(audioCelebrate);
-  if (audioNervous) audioNervous.playbackRate = 1; // ✅ 還原
+  if (audioNervous) audioNervous.playbackRate = 1;
   if (audioFinish)  audioFinish.playbackRate  = 1;
   if (audioNormal)  audioNormal.playbackRate  = 1;
   stopAllMainBgm();
 }
 
-    // ====== 狀態 & DOM ======
-    const state = {
+// ====== 狀態 & DOM ======
+const state = {
   pos: Object.fromEntries(players.map(p => [p.id, 0])),
   speed: 1.0,
-  finished: null,       // 第一個通關者（冠軍）
-  finishOrder: [],      // 依抵達終點的順序存放 id
+  finished: null,
+  finishOrder: [],
   stepQueue: [],
   roundStartStep: {},
 };
 
+const rankCache = new Map();
+let prevRankIndex = new Map();
+let winnerStarInterval = null;
 
-    let fastMode = false;
+const btnStart = document.getElementById("btnStart");
+const btnPrev  = document.getElementById("btnPrev");
+const btnNext  = document.getElementById("btnNext");
+const btnReset = document.getElementById("btnReset");
+const speedEl  = document.getElementById("speed");
+const speedTextEl = document.getElementById("speedText");
 
-    const rankCache = new Map();     // id -> li
-let prevRankIndex = new Map();   // id -> 上一次名次(0-based)
-let winnerStarInterval = null;   // 冠軍賽道噴星星的定時器
+const splash      = document.getElementById("splash");
+const splashStart = document.getElementById("splashStart");
+const splashLater = document.getElementById("splashLater");
 
+const fireworksEl = document.getElementById("fireworks");
+const itemFxEl   = document.getElementById("itemFx");
+const roundJumpButtonsEl = document.getElementById("roundJumpButtons");
+const winnerBannerEl = document.getElementById("winnerBanner");
+const clearRankSectionEl = document.getElementById("clearRankSection");
+const clearRankListEl    = document.getElementById("clearRank");
 
-
-
-    const btnStart = document.getElementById("btnStart");
-    const btnPrev  = document.getElementById("btnPrev");
-    const btnNext  = document.getElementById("btnNext");
-    const btnReset = document.getElementById("btnReset");
-    const speedEl  = document.getElementById("speed");
-    const speedTextEl = document.getElementById("speedText");
-
-    const splash      = document.getElementById("splash");
-    const splashStart = document.getElementById("splashStart");
-    const splashLater = document.getElementById("splashLater");
-
-    const fireworksEl = document.getElementById("fireworks");
-    const itemFxEl   = document.getElementById("itemFx");
-    const roundJumpButtonsEl = document.getElementById("roundJumpButtons");
-    const winnerBannerEl = document.getElementById("winnerBanner");
-    const clearRankSectionEl = document.getElementById("clearRankSection");
-    const clearRankListEl    = document.getElementById("clearRank");
-
-    function sleep(ms){
-  const factor = 1.15;  // 全部節奏放慢 1.15 倍（想再慢一點就 1.2）
+function sleep(ms){
+  const factor = 1.15;
   return new Promise(r => setTimeout(r, fastMode ? 0 : ms * factor));
 }
-    function findPlayer(id){ return players.find(p => p.id === id); }
-    function findName(id){ return findPlayer(id)?.name ?? id; }
+function findPlayer(id){ return players.find(p => p.id === id); }
+function findName(id){ return findPlayer(id)?.name ?? id; }
 
-    const stageEl = document.querySelector(".stage");
-    const lanesEl = document.getElementById("lanes");
-    const rankEl  = document.getElementById("rank");
+const stageEl = document.querySelector(".stage");
+const lanesEl = document.getElementById("lanes");
+const rankEl  = document.getElementById("rank");
 
-    const overlayTitleEl   = document.getElementById("overlayTitle");
-    const overlayLinesEl   = document.getElementById("overlayLines");
-    const overlayPlayersEl = document.getElementById("overlayPlayers");
-    const overlayNoteEl    = document.getElementById("overlayNote");
-    const overlayBadgeEl   = document.getElementById("overlayBadge");
+const overlayTitleEl   = document.getElementById("overlayTitle");
+const overlayLinesEl   = document.getElementById("overlayLines");
+const overlayPlayersEl = document.getElementById("overlayPlayers");
+const overlayNoteEl    = document.getElementById("overlayNote");
+const overlayBadgeEl   = document.getElementById("overlayBadge");
 
-    const cardAreaEl  = document.getElementById("cardArea");
-    const cardEl      = document.getElementById("card");
-    const cardFrontEl = document.getElementById("cardFront");
-    const cardHintEl  = document.getElementById("cardHint");
-    const overlayEl   = document.getElementById("overlay");
-    // ====== 整頁自動縮放（手機版） ======
+const cardAreaEl  = document.getElementById("cardArea");
+const cardEl      = document.getElementById("card");
+const cardFrontEl = document.getElementById("cardFront");
+const cardHintEl  = document.getElementById("cardHint");
+const overlayEl   = document.getElementById("overlay");
+
+// ====== 整頁自動縮放（手機版） ======
 const viewportEl = document.querySelector(".viewport");
 const stageRootEl = document.getElementById("stage");
 
 function fitStage(){
-  // ✅ 不再用 transform 縮放整個舞台（iOS 會讓捲動/高度計算怪怪的）
   stageRootEl.style.transformOrigin = "top left";
   stageRootEl.style.transform = "none";
 }
-
-// 視窗變動時重算（resize / 旋轉）
 let fitTimer = null;
 function requestFitStage(){
   clearTimeout(fitTimer);
@@ -2432,39 +2417,33 @@ function requestFitStage(){
 window.addEventListener("resize", requestFitStage);
 window.addEventListener("orientationchange", () => setTimeout(fitStage, 120));
 
-
 // 🌸 在卡片區播放一次性的櫻花雨（從右下往左上飛）
 function playCardPetalsOnce(){
   if (fastMode) return Promise.resolve();
 
-  // ★ 播放一次魔法音效，會回傳一個 Promise
   const magicPromise = playMagicOnce();
 
   const layer = document.getElementById("overlayPetals");
-  if (!layer) return magicPromise;   // 沒有圖層就只等音效結束
+  if (!layer) return magicPromise;
 
-  // 清空舊的花瓣
   layer.innerHTML = "";
 
-  const PETAL_COUNT = 10;   // 想更密可以調大
+  const PETAL_COUNT = IS_MOBILE ? 7 : 10; // ✅ 手機少一點
   let maxTime = 0;
 
   for (let i = 0; i < PETAL_COUNT; i++){
     const p = document.createElement("div");
     p.className = "overlay-petal";
 
-    // 大小 18~34px
     const size = 18 + Math.random() * 16;
     p.style.width  = size + "px";
     p.style.height = size + "px";
 
-    // 從卡片偏右下角出生
-    const startLeft = 55 + Math.random() * 40;  // 55% ~ 95%（偏右）
-    const startTop  = 55 + Math.random() * 35;  // 55% ~ 90%（偏下）
+    const startLeft = 55 + Math.random() * 40;
+    const startTop  = 55 + Math.random() * 35;
     p.style.left = startLeft + "%";
     p.style.top  = startTop  + "%";
 
-    // 速度 2.4～3.2 秒
     const dur   = 2.4 + Math.random() * 0.8;
     const delay = Math.random() * 0.25;
 
@@ -2474,26 +2453,20 @@ function playCardPetalsOnce(){
 
     p.style.setProperty("--dur",   dur   + "s");
     p.style.setProperty("--delay", delay + "s");
-
-    // 讓每片花瓣的位移範圍更分散（給 keyframes 用）
     p.style.setProperty("--dx", (60 + Math.random() * 180) + "px");
     p.style.setProperty("--dy", (80 + Math.random() * 220) + "px");
-
     p.style.setProperty("--r0",    r0);
     p.style.setProperty("--r1",    r1);
     p.style.setProperty("--alpha", alpha);
 
-    // 加到圖層裡
     layer.appendChild(p);
 
-    // 在「這一片花瓣」旁邊加 ♥ / ⭑ 小火花（會往外噴出）
-    attachPetalSparks(p, {min:1, max:3});
+    // 手機也少一點 spark
+    attachPetalSparks(p, IS_MOBILE ? {min:1, max:2} : {min:1, max:3});
 
-    // 記一下這片動畫總長，用來決定何時清空
     maxTime = Math.max(maxTime, dur + delay);
   }
 
-  // 花瓣結束的 Promise
   const petalsPromise = new Promise(resolve => {
     const totalMs = (maxTime + 0.3) * 1000;
     setTimeout(() => {
@@ -2502,62 +2475,46 @@ function playCardPetalsOnce(){
     }, totalMs);
   });
 
-  // ✅ 讓呼叫端可以 `await playCardPetalsOnce()`：
-  //    會同時等「魔法音效」＋「花瓣動畫」都結束
   return Promise.all([magicPromise, petalsPromise]);
 }
 
-
-// 在某個花瓣元素旁邊，隨機加幾顆 ♥ / ⭑ 小發光（粉紅色，往外噴出）
 function attachPetalSparks(el, {min = 1, max = 3} = {}){
-  // 要幾顆小光點
   const count = min + Math.floor(Math.random() * (max - min + 1));
 
   for (let i = 0; i < count; i++){
     const span = document.createElement("span");
     span.className = "petal-spark";
-
-    // ♥ / ⭑ 形狀
     span.textContent = (Math.random() < 0.5) ? "♥" : "⭑";
 
-    // 粉紅色 + 一點點光暈
-    span.style.color = "#ff91c1"; // 粉紅
+    span.style.color = "#ff91c1";
     span.style.textShadow = "0 0 6px rgba(255,145,193,0.85)";
 
-    // 大小 8~13px，比原本大一點，較容易看見
     const size = 8 + Math.random() * 5;
     span.style.setProperty("--sparkSize", size + "px");
 
-    // 視覺大小微調
     const scale = 0.9 + Math.random() * 0.5;
     span.style.setProperty("--sparkScale", scale);
 
-    // 噴出的時間 & 延遲（較短，感覺比較「蹦」）
-    const dur   = 600 + Math.random() * 600;    // 0.6 ~ 1.2 秒
-    const delay = Math.random() * 200;          // 0 ~ 0.2 秒
+    const dur   = 600 + Math.random() * 600;
+    const delay = Math.random() * 200;
     span.style.setProperty("--sparkDur",   dur   + "ms");
     span.style.setProperty("--sparkDelay", delay + "ms");
 
-    // 噴出方向：從花瓣外圍往外飛，位移比原本大
-    const dx = (Math.random() * 80 - 40) + "px";     // 左右 -40 ~ +40
-    const dy = (-20 - Math.random() * 80) + "px";    // 往上 -20 ~ -100
+    const dx = (Math.random() * 80 - 40) + "px";
+    const dy = (-20 - Math.random() * 80) + "px";
     span.style.setProperty("--sparkDx", dx);
     span.style.setProperty("--sparkDy", dy);
 
-    // 出現位置：環繞花瓣「外圈」，避免壓在花瓣正中央
-    const angle = Math.random() * Math.PI * 2;  // 0 ~ 2π
-    const radius = 70 + Math.random() * 20;     // 離中心 70%~90% 的環帶
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 70 + Math.random() * 20;
     const cx = 50 + Math.cos(angle) * radius;
     const cy = 50 + Math.sin(angle) * radius;
     span.style.left = cx + "%";
     span.style.top  = cy + "%";
 
-    // 直接塞進花瓣裡，會跟著花瓣一起飄
     el.appendChild(span);
   }
 }
-
-
 
 // ====== Overlay 操作（卡牌在左） ======
 function showOverlay(
@@ -2614,13 +2571,11 @@ function showOverlay(
 
   overlayNoteEl.textContent = note || "";
 
-  // badge（MP25xx 審查通過）
   if (overlayBadgeEl) {
     if (badgeText) {
       if (overlayBadgeEl.dataset.text !== badgeText) {
         overlayBadgeEl.dataset.text = badgeText;
-        overlayBadgeEl.innerHTML =
-          `<span class="overlay-badge-text">${badgeText}</span>`;
+        overlayBadgeEl.innerHTML = `<span class="overlay-badge-text">${badgeText}</span>`;
       }
       overlayBadgeEl.classList.remove("hidden");
     } else {
@@ -2630,145 +2585,125 @@ function showOverlay(
     }
   }
 
-  // 卡片顯示／翻面
   cardFrontEl.textContent = showCard ? cardText : "";
   cardHintEl.textContent  = showCard ? cardHint : "抽卡結果";
   cardEl.classList.remove("flip");
 
-  // ✅ 只負責翻卡，不再自動放花瓣
   if (showCard && flip) {
-    setTimeout(() => {
-      cardEl.classList.add("flip");
-    }, 120);
+    setTimeout(() => { cardEl.classList.add("flip"); }, 120);
   }
 }
 
-    // ====== 建立賽道 ======
-    function buildLanes(){
-      lanesEl.innerHTML = "";
-      players.forEach((p, index) => {
-        const lane = document.createElement("div");
-        lane.className = "lane";
-        lane.dataset.id = p.id;
+// ====== 建立賽道 ======
+function buildLanes(){
+  lanesEl.innerHTML = "";
+  players.forEach((p, index) => {
+    const lane = document.createElement("div");
+    lane.className = "lane";
+    lane.dataset.id = p.id;
 
-        const info = document.createElement("div");
-        info.className = "lane-info";
+    const info = document.createElement("div");
+    info.className = "lane-info";
 
-        const order = document.createElement("div");
-        order.className = "lane-order";
-        order.textContent = index + 1;
+    const order = document.createElement("div");
+    order.className = "lane-order";
+    order.textContent = index + 1;
 
-        const avatar = document.createElement("div");
-        avatar.className = "lane-avatar-static";
-        const img = document.createElement("img");
-        img.src = p.img;
-        img.alt = p.name;
-        avatar.appendChild(img);
+    const avatar = document.createElement("div");
+    avatar.className = "lane-avatar-static";
+    const img = document.createElement("img");
+    img.src = p.img;
+    img.alt = p.name;
+    avatar.appendChild(img);
 
-        const name = document.createElement("div");
-        name.className = "lane-name";
-        name.textContent = p.name;
+    const name = document.createElement("div");
+    name.className = "lane-name";
+    name.textContent = p.name;
 
-        info.appendChild(order);
-        info.appendChild(avatar);
-        info.appendChild(name);
+    info.appendChild(order);
+    info.appendChild(avatar);
+    info.appendChild(name);
 
-        const track = document.createElement("div");
-track.className = "lane-track";
+    const track = document.createElement("div");
+    track.className = "lane-track";
 
-// 起點線（START）
-const startLine = document.createElement("div");
-startLine.className = "lane-line lane-line-start";
-const startLabel = document.createElement("div");
-startLabel.className = "lane-line-label";
-startLabel.textContent = "START";
-startLine.appendChild(startLabel);
-startLine.style.left = progressPercent(0) + "%";
+    const startLine = document.createElement("div");
+    startLine.className = "lane-line lane-line-start";
+    const startLabel = document.createElement("div");
+    startLabel.className = "lane-line-label";
+    startLabel.textContent = "START";
+    startLine.appendChild(startLabel);
+    startLine.style.left = progressPercent(0) + "%";
 
-// 終點線（FINISH）
-const finishLine = document.createElement("div");
-finishLine.className = "lane-line lane-line-finish";
-const finishLabel = document.createElement("div");
-finishLabel.className = "lane-line-label";
-finishLabel.textContent = "FINISH";
-finishLine.appendChild(finishLabel);
-finishLine.style.left = progressPercent(FINISH) + "%";
+    const finishLine = document.createElement("div");
+    finishLine.className = "lane-line lane-line-finish";
+    const finishLabel = document.createElement("div");
+    finishLabel.className = "lane-line-label";
+    finishLabel.textContent = "FINISH";
+    finishLine.appendChild(finishLabel);
+    finishLine.style.left = progressPercent(FINISH) + "%";
 
-// 底下填色條
-const bar = document.createElement("div");
-bar.className = "lane-bar";
+    const bar = document.createElement("div");
+    bar.className = "lane-bar";
+    const fill = document.createElement("div");
+    fill.className = "lane-bar-fill";
+    fill.id = `bar-${p.id}`;
+    bar.appendChild(fill);
 
-const fill = document.createElement("div");
-fill.className = "lane-bar-fill";
-fill.id = `bar-${p.id}`;
-bar.appendChild(fill);
+    const marker = document.createElement("div");
+    marker.className = "lane-marker";
+    marker.id = `marker-${p.id}`;
 
-// 跑動頭像
-const marker = document.createElement("div");
-marker.className = "lane-marker";
-marker.id = `marker-${p.id}`;
+    const mImg = document.createElement("img");
+    mImg.src = p.img;
+    mImg.alt = p.name;
+    marker.appendChild(mImg);
 
-const mImg = document.createElement("img");
-mImg.src = p.img;
-mImg.alt = p.name;
-marker.appendChild(mImg);
+    const crown = document.createElement("div");
+    crown.className = "lane-crown";
+    crown.textContent = "👑";
+    marker.appendChild(crown);
 
-// 👑 冠軍皇冠
-const crown = document.createElement("div");
-crown.className = "lane-crown";
-crown.textContent = "👑";
-marker.appendChild(crown);
+    const label = document.createElement("div");
+    label.className = "lane-pos-label";
+    label.id = `pos-${p.id}`;
+    label.textContent = "🐾 0 格";
+    marker.appendChild(label);
 
-// 目前格數標籤
-const label = document.createElement("div");
-label.className = "lane-pos-label";
-label.id = `pos-${p.id}`;
-label.textContent = "🐾 0 格";
-marker.appendChild(label);
+    track.appendChild(bar);
+    track.appendChild(startLine);
+    track.appendChild(finishLine);
+    track.appendChild(marker);
 
-/* 把起點線＆終點線真的放進賽道裡 */
-track.appendChild(bar);
-track.appendChild(startLine);
-track.appendChild(finishLine);
-track.appendChild(marker);
+    lane.appendChild(info);
+    lane.appendChild(track);
+    lanesEl.appendChild(lane);
+  });
 
-lane.appendChild(info);
-lane.appendChild(track);
-lanesEl.appendChild(lane);
+  updateAllProgress();
+}
 
-      });
+function progressPercent(pos){
+  const startPct   = 4;
+  const finishPct  = 83;
+  const maxPct     = 92;
 
-      updateAllProgress();
-    }
-
-    function progressPercent(pos){
-  // 賽道可見範圍（百分比）
-  const startPct   = 4;   // 0 格時頭像的位置
-  const finishPct  = 83;  // 終點線在畫面上的位置
-  const maxPct     = 92;  // 頭像最多只到這裡，不會衝出賽道
-
-  // 安全處理負數
   if (pos <= 0) return startPct;
 
-  // 1) 終點前：維持線性（1 格 = 固定距離）
   if (pos <= FINISH){
-    const ratio = pos / FINISH; // 0 ~ 1
+    const ratio = pos / FINISH;
     return startPct + (finishPct - startPct) * ratio;
   }
 
-  // 2) 終點後：步幅縮小一點，避免跑太遠
-  const preStep   = (finishPct - startPct) / FINISH; // 終點前每 1 格位移
-  const afterStep = preStep * 0.7;                   // 終點後改成 0.7 倍
+  const preStep   = (finishPct - startPct) / FINISH;
+  const afterStep = preStep * 0.7;
 
-  const extraCells = pos - FINISH;                   // 超過終點幾格
+  const extraCells = pos - FINISH;
   const beyondPct  = finishPct + extraCells * afterStep;
-
-  // 不讓頭像超出賽道
   return Math.min(beyondPct, maxPct);
 }
 
-
-    function updateAllProgress(){
+function updateAllProgress(){
   players.forEach(p => {
     const pos = state.pos[p.id] ?? 0;
 
@@ -2777,7 +2712,6 @@ lanesEl.appendChild(lane);
     const label  = document.getElementById(`pos-${p.id}`);
     if (!fill || !marker || !label) return;
 
-    // 位置換算
     const pct = progressPercent(pos);
     fill.style.width  = pct + "%";
     marker.style.left = pct + "%";
@@ -2785,39 +2719,29 @@ lanesEl.appendChild(lane);
     const reachedFinish = pos >= FINISH;
     const beyondFinish  = pos > FINISH;
 
-    // 先把「超過終點」標記拿掉
     label.classList.remove("beyond-finish");
 
-    // 🔹 1) < 46 格：顯示 🐾 X 格，跟著頭像跑
     if (!reachedFinish){
       label.style.display = "flex";
       label.textContent   = `🐾 ${pos} 格`;
-    }
-    // 🔹 2) 剛好 46 格：不顯示標籤
-    else if (pos === FINISH){
+    } else if (pos === FINISH){
       label.style.display = "none";
-    }
-    // 🔹 3) > 46 格：改成 🚀 X 格，並套用 beyond-finish 讓標籤跑去火箭旁邊
-    else{
+    } else {
       label.style.display = "flex";
       label.textContent   = ` ${pos} 格`;
       label.classList.add("beyond-finish");
     }
 
-    // 清掉舊的完成／火箭相關 class & 元素
     marker.classList.remove("finished","star-power","rainbow-power");
     const oldRocket = marker.querySelector(".lane-rocket");
     if (oldRocket) oldRocket.remove();
 
-    // 🔸 抵達終點（含超過）：有完成光暈 + 星光
     if (reachedFinish){
       marker.classList.add("finished","star-power");
     }
 
-    // 🔸 超過終點：加上火箭 + 彩虹殘影
     if (beyondFinish){
       marker.classList.add("rainbow-power");
-
       const rocket = document.createElement("div");
       rocket.className = "lane-rocket";
       rocket.textContent = "🚀";
@@ -2825,14 +2749,11 @@ lanesEl.appendChild(lane);
     }
   });
 
-
-  // ★ 每次更新賽道時，順便檢查要不要切換 BGM
   checkRaceMusicTriggers();
   updateRivalryMarkers();
 }
 
 function updateRivalryMarkers(){
-  // 已經結束就確保全部清乾淨
   if (rivalryEnded){
     players.forEach(p => {
       const marker = document.getElementById(`marker-${p.id}`);
@@ -2840,11 +2761,8 @@ function updateRivalryMarkers(){
     });
     return;
   }
-
-  // 還沒開始就什麼都不做
   if (!rivalryStarted) return;
 
-  // 競速進行中：>=38 的人套用；<38 的人移除
   players.forEach(p => {
     const pos = state.pos[p.id] ?? 0;
     const marker = document.getElementById(`marker-${p.id}`);
@@ -2858,92 +2776,69 @@ function updateRivalryMarkers(){
   });
 }
 
-// ====== 依賽況切換 BGM（38 格 nervous / 46 格 finish）=====
 function checkRaceMusicTriggers(){
-  // 快轉時就不要切歌，避免重播時一直跳
   if (fastMode) return;
 
-  // 找出目前「最前面」的那位選手位置
   let maxPos = 0;
-  players.forEach(p => {
-    const pos = state.pos[p.id] ?? 0;
-    if (pos > maxPos) maxPos = pos;
-  });
+  players.forEach(p => { maxPos = Math.max(maxPos, state.pos[p.id] ?? 0); });
 
-  // 如果已經啟動過終點 BGM，就維持 finish，不再改
-  if (finishStarted){
-    return;
-  }
+  if (finishStarted) return;
 
-  // ⭐ 第一次有人到達或超過終點：標記 finish + 結束競速效果
   if (maxPos >= FINISH){
     finishStarted = true;
-
-    // 結束 38~46 競速火焰效果
     rivalryEnded   = true;
     rivalryStarted = false;
-    updateRivalryMarkers(); // 把全部人的 rivalry-hot 拿掉
-
-    // 注意：真正播放 finish BGM 交給 celebrateFinish() 處理
+    updateRivalryMarkers();
     return;
   }
 
-  // ⭐ 還沒到終點，且第一次有人進入 38 格區間：啟動競速效果 + nervous BGM
   if (maxPos >= 38){
-    // 競速火焰只啟動一次
     if (!rivalryStarted && !rivalryEnded){
       rivalryStarted = true;
       updateRivalryMarkers();
     }
-
-    // nervous BGM 只啟動一次
     if (!nervousStarted){
-  nervousStarted = true;
-  playMainBgm("nervous");   // ✅ 緊張 BGM 進入後一路 loop 到 46
-}
+      nervousStarted = true;
+      playMainBgm("nervous");
+    }
   }
-
-  // 其他情況就維持原本 BGM（normal 或 nervous），不特別處理
 }
 
-    // ====== 建立右側「回合快速跳轉」按鈕 ======
-    function buildRoundJumpButtons(){
-      if (!roundJumpButtonsEl) return;
-      roundJumpButtonsEl.innerHTML = "";
+// ====== 建立右側「回合快速跳轉」按鈕 ======
+function buildRoundJumpButtons(){
+  if (!roundJumpButtonsEl) return;
+  roundJumpButtonsEl.innerHTML = "";
 
-      rounds.forEach(r => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "round-jump-btn";
-        btn.textContent = `第 ${r.round} 回合`;
-        btn.addEventListener("click", () => {
-          jumpToRound(r.round);
-        });
-        roundJumpButtonsEl.appendChild(btn);
-      });
-    }
+  rounds.forEach(r => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "round-jump-btn";
+    btn.textContent = `第 ${r.round} 回合`;
+    btn.addEventListener("click", () => { jumpToRound(r.round); });
+    roundJumpButtonsEl.appendChild(btn);
+  });
+}
 
-    // ====== 排名（右側列表） ======
-    function getOrderedPlayers(){
-      return [...players].sort((a,b)=>{
-        const pa = state.pos[a.id];
-        const pb = state.pos[b.id];
-        if (pb !== pa) return pb - pa;
-        return players.findIndex(x=>x.id===a.id) - players.findIndex(x=>x.id===b.id);
-      });
-    }
+// ====== 排名（右側列表） ======
+function getOrderedPlayers(){
+  return [...players].sort((a,b)=>{
+    const pa = state.pos[a.id];
+    const pb = state.pos[b.id];
+    if (pb !== pa) return pb - pa;
+    return players.findIndex(x=>x.id===a.id) - players.findIndex(x=>x.id===b.id);
+  });
+}
 
-    function updateRank(){
+function updateRank(){
   const ordered = getOrderedPlayers();
 
-  // 先算每個人的名次變動（只是用來算 ↑↓ 和判斷有沒有人變動）
-  const diffs   = new Map();       // id -> diff（舊名次 - 新名次）
-  let anyMoved  = false;           // 這一輪有沒有人名次有變
+  const diffs   = new Map();
+  let anyMoved  = false;
   const hadPrev = prevRankIndex.size > 0;
 
   ordered.forEach((p, i) => {
     const oldIdx = prevRankIndex.has(p.id) ? prevRankIndex.get(p.id) : i;
-    const diff   = oldIdx - i;  // 正數代表名次上升
+    const diff   = oldIdx - i;
     diffs.set(p.id, diff);
     if (diff !== 0) anyMoved = true;
   });
@@ -2953,7 +2848,6 @@ function checkRaceMusicTriggers(){
   ordered.forEach((p, i) => {
     let li = rankCache.get(p.id);
 
-    // 第一次建立 li
     if (!li){
       li = document.createElement("li");
 
@@ -2998,32 +2892,26 @@ function checkRaceMusicTriggers(){
       rankCache.set(p.id, li);
     }
 
-    // 更新右側格數
     const curPos = state.pos[p.id];
     li.querySelector(".pos").textContent =
       curPos > FINISH ? `🚀 ${curPos} 格` : `🐾 ${curPos} 格`;
 
-    // 名次文字
     li.querySelector(".rank-title").textContent = `${i+1}. ${p.name}`;
 
-    // 冠軍皇冠（只給第一個到達終點的人）
     const crownEl = li.querySelector(".rank-crown");
     if (crownEl){
       const isWinner = !!state.finished && (p.id === state.finished);
       crownEl.classList.toggle("show", isWinner);
     }
 
-    // 名次變動 diff → 顯示 ↑↓ 徽章
     const diff    = diffs.get(p.id) || 0;
     const deltaEl = li.querySelector(".rank-delta");
 
-    deltaEl.className     = "rank-delta"; // 重置 class
+    deltaEl.className     = "rank-delta";
     deltaEl.style.display = "none";
     deltaEl.textContent   = "";
 
-    // 預設沒有上升
     li.dataset.rankUp = (diff > 0) ? "1" : "0";
-    // 🔹 名次持平（而且這一輪有任何人變動 & 不是第一次排序）就標記起來
     li.dataset.rankSame = (diff === 0 && hadPrev && anyMoved) ? "1" : "0";
 
     if (diff > 0){
@@ -3036,26 +2924,20 @@ function checkRaceMusicTriggers(){
       deltaEl.style.display = "inline-flex";
     }
 
-    // 沒有變動的名次，在「不是第一次排序」且「這一輪有人變動」時淡化
     if (hadPrev && anyMoved && diff === 0){
       li.classList.add("rank-static");
     }else{
       li.classList.remove("rank-static");
     }
 
-    // 不再使用 rank-pop / rank-moving 的 FLIP 浮出動畫
     li.classList.remove("rank-pop", "rank-moving");
-
     frag.appendChild(li);
   });
 
-  // 重新掛回去（照新排序）
   rankEl.replaceChildren(frag);
 
-  // ⭐ 右→左一個一個滑進來的動畫
-      const items = Array.from(rankEl.children);
+  const items = Array.from(rankEl.children);
   items.forEach((li, index) => {
-    // fastMode 時就不要做進場＋發光動畫，免得卡卡
     if (fastMode){
       li.style.opacity   = "1";
       li.style.transform = "translateX(0)";
@@ -3063,19 +2945,17 @@ function checkRaceMusicTriggers(){
       return;
     }
 
-    // 初始狀態：透明＋在右邊一點
     li.style.opacity   = "0";
     li.style.transform = "translateX(32px)";
     li.style.transition = "none";
 
-    const baseDelay   = index * 70;   // 滑進來的延遲
-    const slideDur    = 420;          // 上面 transition 的時間
-    const shineDelay  = baseDelay + slideDur; // 滑完再發光
+    const baseDelay   = index * 70;
+    const slideDur    = 420;
+    const shineDelay  = baseDelay + slideDur;
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        li.style.transition =
-          "transform 420ms ease-out, opacity 420ms ease-out";
+        li.style.transition = "transform 420ms ease-out, opacity 420ms ease-out";
         li.style.transitionDelay = `${baseDelay}ms`;
         li.style.opacity   = "1";
         li.style.transform = "translateX(0)";
@@ -3085,31 +2965,21 @@ function checkRaceMusicTriggers(){
     const isRankUp   = (li.dataset.rankUp === "1");
     const isRankSame = (li.dataset.rankSame === "1");
 
-    // 🔹 名次持平 → 銀色金屬光澤
     if (isRankSame){
       setTimeout(() => {
         li.classList.add("rank-same-glow");
-        setTimeout(() => {
-          li.classList.remove("rank-same-glow");
-        }, 800);
+        setTimeout(() => li.classList.remove("rank-same-glow"), 800);
       }, shineDelay);
     }
 
-    // 🔹 名次上升 → 藍色金屬光澤（原本這段）
     if (isRankUp){
       setTimeout(() => {
         li.classList.add("rank-up-glow");
-        setTimeout(() => {
-          li.classList.remove("rank-up-glow");
-        }, 800);
+        setTimeout(() => li.classList.remove("rank-up-glow"), 800);
       }, shineDelay);
     }
   });
 
-
-
-
-  // 更新「上一輪名次」記錄，給下一次比較用
   prevRankIndex = new Map(ordered.map((p, i) => [p.id, i]));
 }
 
@@ -3119,14 +2989,12 @@ function updateClearRank(){
 
   const order = state.finishOrder;
 
-  // 還沒有人到終點：整塊區域隱藏
   if (!order.length){
     clearRankSectionEl.hidden = true;
     clearRankListEl.innerHTML = "";
     return;
   }
 
-  // 有人到終點：顯示區塊
   clearRankSectionEl.hidden = false;
   clearRankListEl.innerHTML = "";
 
@@ -3147,7 +3015,6 @@ function updateClearRank(){
     img.alt = p.name;
     avatarWrap.appendChild(img);
 
-    // 只在通關第一名頭上戴皇冠
     if (idx === 0){
       const crown = document.createElement("div");
       crown.className = "rank-crown show";
@@ -3163,8 +3030,7 @@ function updateClearRank(){
 
     const right = document.createElement("div");
     right.className = "pos";
-    right.textContent =
-      state.pos[id] > FINISH ? `🚀 ${state.pos[id]} 格` : `🐾 ${state.pos[id]} 格`;
+    right.textContent = state.pos[id] > FINISH ? `🚀 ${state.pos[id]} 格` : `🐾 ${state.pos[id]} 格`;
 
     li.appendChild(left);
     li.appendChild(right);
@@ -3173,28 +3039,28 @@ function updateClearRank(){
   });
 }
 
-    // ====== 焦點效果 ======
-    function setFocus(focusIds){
-      const set = new Set(focusIds);
-      players.forEach(p=>{
-        const lane = document.querySelector(`.lane[data-id="${p.id}"]`);
-        if (!lane) return;
-        lane.classList.remove("dim","focus");
-        if (focusIds.length){
-          if (set.has(p.id)) lane.classList.add("focus");
-          else lane.classList.add("dim");
-        }
-      });
+// ====== 焦點效果 ======
+function setFocus(focusIds){
+  const set = new Set(focusIds);
+  players.forEach(p=>{
+    const lane = document.querySelector(`.lane[data-id="${p.id}"]`);
+    if (!lane) return;
+    lane.classList.remove("dim","focus");
+    if (focusIds.length){
+      if (set.has(p.id)) lane.classList.add("focus");
+      else lane.classList.add("dim");
     }
-    function clearFocus(){
-      players.forEach(p=>{
-        const lane = document.querySelector(`.lane[data-id="${p.id}"]`);
-        if (!lane) return;
-        lane.classList.remove("dim","focus");
-      });
-    }
+  });
+}
+function clearFocus(){
+  players.forEach(p=>{
+    const lane = document.querySelector(`.lane[data-id="${p.id}"]`);
+    if (!lane) return;
+    lane.classList.remove("dim","focus");
+  });
+}
 
-    // ====== 道具特效（抽卡用：花瓣飄落） ======
+// ====== 道具特效（抽卡用：星星） ======
 function playItemFx(style){
   if (fastMode) return;
 
@@ -3208,32 +3074,27 @@ function playItemFx(style){
   const vw   = window.innerWidth;
   const vh   = window.innerHeight;
 
-  const baseX = (rect.left + rect.width  / 2) / vw * 100; // 0~100
-  const baseY = (rect.top  + rect.height / 2) / vh * 100; // 0~100
+  const baseX = (rect.left + rect.width  / 2) / vw * 100;
+  const baseY = (rect.top  + rect.height / 2) / vh * 100;
 
-  const count = 8;
-
+  const count = IS_MOBILE ? 5 : 8;
   let maxEnd = 0;
 
   for (let i = 0; i < count; i++) {
     const s = document.createElement("div");
     s.className = "track-star";
 
-    // ✅ 這裡改成符合你 CSS 會用到的變數：--dur --delay --drift --r0 --r1 --alpha --blur
-    const size  = 40 + Math.random() * 28; // 40~68px
-    const durMs = 6500 + Math.random() * 3500;      // 2.6~4.2s（你要更慢就加大）
-    const delay = Math.random() * 260;              // 0~260ms
-    const drift = 22 + Math.random() * 38;          // 左右擺動幅度
+    const size  = 40 + Math.random() * 28;
+    const durMs = 6500 + Math.random() * 3500;
+    const delay = Math.random() * 260;
+    const drift = 22 + Math.random() * 38;
     const r0    = (Math.random() * 360) + "deg";
     const r1    = (Math.random() * 360) + "deg";
-    const alpha = 0.35 + Math.random() * 0.25;      // 0.35~0.60
-    const blur  = Math.random() < 0.45 ? (1 + Math.random() * 2) : 0; // 遠景略糊
+    const alpha = 0.35 + Math.random() * 0.25;
+    const blur  = Math.random() < 0.45 ? (1 + Math.random() * 2) : 0;
 
-    // 位置：從卡牌附近開始
     s.style.setProperty("--x", baseX + "vw");
     s.style.setProperty("--y", baseY + "vh");
-
-
     s.style.setProperty("--size",  size + "px");
     s.style.setProperty("--dur",   durMs + "ms");
     s.style.setProperty("--delay", delay + "ms");
@@ -3244,85 +3105,19 @@ function playItemFx(style){
     s.style.setProperty("--blur",  blur + "px");
 
     itemFxEl.appendChild(s);
-
     maxEnd = Math.max(maxEnd, durMs + delay);
   }
 
-  // ✅ 不要固定 1800ms，改成等動畫真的跑完再清
   setTimeout(() => {
     itemFxEl.style.display = "none";
     itemFxEl.innerHTML = "";
   }, maxEnd + 200);
 }
 
-    // ====== 駱駝使用前進卡：賽道 + 字幕卡雙重花瓣 ======
-function playCamelUseFx(){
-  if (fastMode) return;
-
-  itemFxEl.innerHTML = "";
-  itemFxEl.style.display = "block";
-
-  const origins = [];
-  const camelMarker = document.getElementById("marker-camel");
-  if (camelMarker) origins.push(camelMarker);
-  if (overlayEl) origins.push(overlayEl);
-
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  let maxEnd = 0;
-
-  origins.forEach(originEl => {
-    const rect = originEl.getBoundingClientRect();
-    const baseX = (rect.left + rect.width  / 2) / vw * 100;
-    const baseY = (rect.top  + rect.height / 2) / vh * 100;
-
-    const count = 10;
-
-    for (let i = 0; i < count; i++) {
-      const s = document.createElement("div");
-      s.className = "track-star";
-
-      const size  = 42 + Math.random() * 30; // 42~72px
-      const durMs = 7000 + Math.random() * 4000;
-      const delay = Math.random() * 260;
-      const drift = 26 + Math.random() * 46;
-      const r0    = (Math.random() * 360) + "deg";
-      const r1    = (Math.random() * 360) + "deg";
-      const alpha = 0.35 + Math.random() * 0.25;
-      const blur  = Math.random() < 0.45 ? (1 + Math.random() * 2) : 0;
-
-      s.style.setProperty("--x", baseX + "vw");
-      s.style.setProperty("--y", baseY + "vh");
-
-
-      s.style.setProperty("--size",  size + "px");
-      s.style.setProperty("--dur",   durMs + "ms");
-      s.style.setProperty("--delay", delay + "ms");
-      s.style.setProperty("--drift", drift + "px");
-      s.style.setProperty("--r0",    r0);
-      s.style.setProperty("--r1",    r1);
-      s.style.setProperty("--alpha", alpha);
-      s.style.setProperty("--blur",  blur + "px");
-
-      itemFxEl.appendChild(s);
-
-      maxEnd = Math.max(maxEnd, durMs + delay);
-    }
-  });
-
-  setTimeout(() => {
-    itemFxEl.style.display = "none";
-    itemFxEl.innerHTML = "";
-  }, maxEnd + 200);
-}
-
-
-        // ====== 天使特效：angel-wing 羽毛從上往下 + 愛心在選手頭像上 ======
+// ====== 天使特效（保留你的邏輯） ======
 function playAngelFx(targetIds = []){
   if (fastMode) return Promise.resolve();
 
-  // ★ 播放一次魔法音效（會回傳 Promise）
   const magicPromise = playMagicOnce();
 
   itemFxEl.innerHTML = "";
@@ -3336,7 +3131,7 @@ function playAngelFx(targetIds = []){
   layer.className = "angel-layer";
   itemFxEl.appendChild(layer);
 
-  const featherCount      = 18;
+  const featherCount      = IS_MOBILE ? 12 : 18;
   const FEATHER_MAX_DUR   = 2400;
   const FEATHER_DELAY_MAX = 380;
 
@@ -3347,31 +3142,22 @@ function playAngelFx(targetIds = []){
     const isNear = Math.random() < 0.55;
     f.classList.add(isNear ? "near" : "far");
 
-    if (Math.random() < 0.5){
-      f.classList.add("flip");
-    }
-    if (Math.random() < 0.5){
-      f.classList.add("right");
-    }
+    if (Math.random() < 0.5) f.classList.add("flip");
+    if (Math.random() < 0.5) f.classList.add("right");
 
     const ratioX = 0.02 + Math.random() * 0.96;
     const startX = rect.left + rect.width * ratioX;
-
     const startY = rect.top - (isNear ? 120 : 80) - Math.random() * 60;
 
     f.style.left = startX + "px";
     f.style.top  = startY + "px";
 
-    const scale = isNear
-      ? 0.8 + Math.random() * 0.25
-      : 0.55 + Math.random() * 0.20;
+    const scale = isNear ? 0.8 + Math.random() * 0.25 : 0.55 + Math.random() * 0.20;
     f.style.setProperty("--scale", scale);
     f.style.setProperty("--rotStart", (Math.random() * 30 - 15) + "deg");
     f.style.setProperty("--rotEnd",   (Math.random() * 30 - 15) + "deg");
 
-    const dur = isNear
-      ? 2000 + Math.random() * 400
-      : 1600 + Math.random() * 300;
+    const dur = isNear ? 2000 + Math.random() * 400 : 1600 + Math.random() * 300;
     f.style.setProperty("--dur", dur + "ms");
     f.style.animationDelay = (Math.random() * FEATHER_DELAY_MAX) + "ms";
 
@@ -3384,6 +3170,8 @@ function playAngelFx(targetIds = []){
     const ids = Array.isArray(targetIds) ? targetIds : [];
     if (!ids.length) return;
 
+    const bubbleCount = IS_MOBILE ? 4 : 6;
+
     ids.forEach(id => {
       const marker = document.getElementById(`marker-${id}`);
       if (!marker) return;
@@ -3392,7 +3180,6 @@ function playAngelFx(targetIds = []){
       const baseX = mr.left + mr.width  / 2;
       const baseY = mr.top  + mr.height / 2;
 
-      const bubbleCount = 6;
       for (let i = 0; i < bubbleCount; i++){
         const b = document.createElement("div");
         b.className = "angel-bubble";
@@ -3412,7 +3199,6 @@ function playAngelFx(targetIds = []){
 
         b.style.setProperty("--dx", dx + "px");
         b.style.setProperty("--dy", dy + "px");
-
         b.style.animationDelay = (Math.random() * 200) + "ms";
 
         layer.appendChild(b);
@@ -3422,7 +3208,6 @@ function playAngelFx(targetIds = []){
 
   const totalDuration = bubbleDelay + 1500 + 200;
 
-  // ✅ 回傳一個 Promise：整個羽毛＋泡泡結束後，順便把圖層清掉
   const fxPromise = new Promise(resolve => {
     setTimeout(() => {
       itemFxEl.style.display = "none";
@@ -3434,33 +3219,24 @@ function playAngelFx(targetIds = []){
   return Promise.all([magicPromise, fxPromise]);
 }
 
-
-    // ====== 第一名煙火：連續放 totalMs 毫秒 ======
+// ====== 第一名煙火（手機降載版） ======
 function playFireworks(totalMs = 3000){
-  if (fastMode) return;
+  if (fastMode || PREFERS_REDUCED) return;
 
   fireworksEl.innerHTML = "";
   fireworksEl.style.display = "block";
 
   const colors = ["#ff6b6b","#ffd166","#4ea1ff","#9d4edd","#4ad66d","#ff8fab","#00d4ff"];
-
-  // 分層：大、中、小（同一波 burst 裡混合）
-  const layers = [
-    { name:"big",   count:18, sz:[8,12],  dist:[90,140],  dur:[1100,1500], z:98 },
-    { name:"mid",   count:26, sz:[5,8],   dist:[60,110],  dur:[900,1300],  z:97 },
-    { name:"small", count:34, sz:[3,6],   dist:[35,80],   dur:[750,1100],  z:96 },
-  ];
+  const layers = FX_CFG.fwLayers;
 
   function rand(min,max){ return min + Math.random() * (max-min); }
   function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
   function randRange(min, max){ return min + Math.random() * (max - min); }
 
   function spawnBurst(){
-    // ✅ 隨機全螢幕散佈（留邊界，避免太貼邊）
     const cx = rand(8, 92);
     const cy = rand(8, 75);
 
-    // ✅ 每一波中心也做「原地跳一下」
     const shock = document.createElement("div");
     shock.className = "fw-spark";
     shock.style.left = cx + "vw";
@@ -3482,12 +3258,6 @@ function playFireworks(totalMs = 3000){
         spark.style.left = cx + "vw";
         spark.style.top  = cy + "vh";
 
-        const angle = Math.random() * Math.PI * 2;
-        const dist  = rand(layer.dist[0], layer.dist[1]);
-
-        const dx = Math.cos(angle) * dist + rand(-10,10);
-        const dy = Math.sin(angle) * dist + rand(-10,10);
-
         spark.style.setProperty("--dx", `${randRange(-80, 80)}px`);
         spark.style.setProperty("--dy", `${randRange(-80, 80)}px`);
         spark.style.setProperty("--clr", pick(colors));
@@ -3501,71 +3271,57 @@ function playFireworks(totalMs = 3000){
     });
   }
 
-  // 一開始就來兩波，畫面更滿
   spawnBurst();
   setTimeout(spawnBurst, 180);
 
-  // ✅ 更頻繁、但每波隨機（看起來更華麗）
-  const interval = setInterval(spawnBurst, 320);
+  const interval = setInterval(spawnBurst, FX_CFG.fireworksInterval);
 
   setTimeout(()=>{
     clearInterval(interval);
     setTimeout(() => {
       fireworksEl.style.display = "none";
       fireworksEl.innerHTML = "";
-
-    }, 1200);   // 留一點時間讓最後一波收尾
+    }, 1200);
   }, totalMs);
 }
 
-
-// ====== 冠軍賽道外框四散噴星星 ======
+// ====== 冠軍賽道外框四散噴星星（手機降載）=====
 function burstWinnerStars(lane){
-  if (fastMode) return;
+  if (fastMode || PREFERS_REDUCED) return;
   if (!lane || !stageEl) return;
 
-  // 以整條 .lane（有外圈高光那一圈）當基準
   const rect = lane.getBoundingClientRect();
   const stageRect = stageEl.getBoundingClientRect();
 
-  const count = 42;  // 星星顆數
+  const count = FX_CFG.winnerBurstCount;
 
   for (let i = 0; i < count; i++){
     const star = document.createElement("div");
     star.className = "star-explode";
+    star.textContent = (Math.random() < 0.5 ? "★" : "⋆");
 
-    const glyph = Math.random() < 0.5 ? "★" : "⋆";
-    star.textContent = glyph;
-
-    // 決定星星從哪一邊冒出來（上 / 下 / 左 / 右）
     const edge = Math.random();
     let x, y;
 
     if (edge < 0.25){
-      // 上邊
       x = rect.left + Math.random() * rect.width;
       y = rect.top;
     }else if (edge < 0.5){
-      // 下邊
       x = rect.left + Math.random() * rect.width;
       y = rect.bottom;
     }else if (edge < 0.75){
-      // 左邊
       x = rect.left;
       y = rect.top + Math.random() * rect.height;
     }else{
-      // 右邊
       x = rect.right;
       y = rect.top + Math.random() * rect.height;
     }
 
-    // 轉成以 .stage 為基準的座標
     const relX = x - stageRect.left;
     const relY = y - stageRect.top;
     star.style.left = relX + "px";
     star.style.top  = relY + "px";
 
-    // 噴射方向與距離
     const angle = Math.random() * Math.PI * 2;
     const dist  = 60 + Math.random() * 60;
 
@@ -3577,539 +3333,454 @@ function burstWinnerStars(lane){
 
     stageEl.appendChild(star);
 
-    setTimeout(() => {
-      star.remove();
-    }, 900);
+    setTimeout(() => { star.remove(); }, 900);
   }
 }
 
+// ====== 移動動畫 ======
+async function moveMany(ids, stepsMap, {focusIds = []} = {}){
+  setFocus(focusIds);
 
-    // ====== 移動動畫 ======
-    async function moveMany(ids, stepsMap, {focusIds = []} = {}){
-      setFocus(focusIds);
+  const before = {};
+  ids.forEach(id => before[id] = state.pos[id]);
 
-      const before = {};
-      ids.forEach(id => before[id] = state.pos[id]);
+  ids.forEach(id=>{
+    const add = stepsMap[id] ?? 0;
+    state.pos[id] = Math.min(state.pos[id] + add, TRACK_CELLS);
+  });
 
-      ids.forEach(id=>{
-        const add = stepsMap[id] ?? 0;
-        state.pos[id] = Math.min(state.pos[id] + add, TRACK_CELLS);
-      });
+  let newlyFinishedChampion = null;
 
-      let newlyFinishedChampion = null;
+  for (const id of ids){
+    const wasBefore = before[id];
+    const nowPos    = state.pos[id];
 
-for (const id of ids){
-  const wasBefore = before[id];
-  const nowPos    = state.pos[id];
+    if (wasBefore < FINISH && nowPos >= FINISH){
+      if (!state.finishOrder.includes(id)){
+        state.finishOrder.push(id);
 
-  // 這一小步裡，從未達終點 → 抵達或超過終點
-  if (wasBefore < FINISH && nowPos >= FINISH){
-    // 還沒記錄過的人才加入 finishOrder
-    if (!state.finishOrder.includes(id)){
-      state.finishOrder.push(id);
-
-      // 第一個通關的人：記成冠軍，等一下放煙火、橫幅
-      if (!state.finished){
-        state.finished = id;
-        newlyFinishedChampion = id;
+        if (!state.finished){
+          state.finished = id;
+          newlyFinishedChampion = id;
+        }
       }
     }
   }
+
+  const duration = 600 / state.speed;
+  ids.forEach(id=>{
+    const fill   = document.getElementById(`bar-${id}`);
+    const marker = document.getElementById(`marker-${id}`);
+    if (!fill || !marker) return;
+    fill.style.transition   = `width ${duration}ms ease-out`;
+    marker.style.transition = `left  ${duration}ms ease-out`;
+  });
+
+  updateAllProgress();
+
+  await sleep(duration + 80);
+  clearFocus();
+  updateRank();
+  updateClearRank();
+
+  if (newlyFinishedChampion){
+    await celebrateFinish(newlyFinishedChampion);
+  }
 }
 
-
-      const duration = 600 / state.speed;
-      ids.forEach(id=>{
-        const fill   = document.getElementById(`bar-${id}`);
-        const marker = document.getElementById(`marker-${id}`);
-        if (!fill || !marker) return;
-        fill.style.transition   = `width ${duration}ms ease-out`;
-        marker.style.transition = `left  ${duration}ms ease-out`;
-      });
-
-      updateAllProgress();
-
-      await sleep(duration + 80);
-      clearFocus();
-      updateRank();
-      updateClearRank();
-
-      if (newlyFinishedChampion){
-  await celebrateFinish(newlyFinishedChampion);
+// ====== 建立播放步驟 ======
+function dateKey(str){
+  const [m, d] = (str || "").split("/").map(x => parseInt(x, 10) || 0);
+  return m * 100 + d;
 }
-    }
 
-    // ====== 建立播放步驟 ======
-    function dateKey(str){
-      const [m, d] = (str || "").split("/").map(x => parseInt(x, 10) || 0);
-      return m * 100 + d;
-    }
-
-    function computeMove(ev){
-      const moveIds = [];
-      const stepsMap = {};
-      if (ev.type === "all"){
-        players.forEach(p=>{
-          moveIds.push(p.id);
-          stepsMap[p.id] = ev.points ?? 0;
-        });
-      }else if (ev.type === "allExcept"){
-        const ex = new Set(ev.except || []);
-        players.forEach(p=>{
-          if (!ex.has(p.id)){
-            moveIds.push(p.id);
-            stepsMap[p.id] = ev.points ?? 0;
-          }
-        });
-      }else if (ev.type === "only"){
-        (ev.only || []).forEach(id=>{
-          moveIds.push(id);
-          stepsMap[id] = ev.points ?? 0;
-        });
-      }else if (ev.type === "byMap"){
-        Object.entries(ev.by || {}).forEach(([id, step])=>{
-          moveIds.push(id);
-          stepsMap[id] = step;
-        });
+function computeMove(ev){
+  const moveIds = [];
+  const stepsMap = {};
+  if (ev.type === "all"){
+    players.forEach(p=>{
+      moveIds.push(p.id);
+      stepsMap[p.id] = ev.points ?? 0;
+    });
+  }else if (ev.type === "allExcept"){
+    const ex = new Set(ev.except || []);
+    players.forEach(p=>{
+      if (!ex.has(p.id)){
+        moveIds.push(p.id);
+        stepsMap[p.id] = ev.points ?? 0;
       }
-      return {moveIds, stepsMap};
-    }
-
-    function buildStepsFromRounds(){
-      const steps = [];
-
-      state.roundStartStep = {};
-
-      for (const r of rounds){
-
-        state.roundStartStep[r.round] = steps.length;
-
-        // 回合開場
-        steps.push(async ()=>{
-          showOverlay(`第 ${r.round} 回合`, ["本回合開始"]);
-          await sleep(700 / state.speed);
-        });
-
-        const allEvents = [];
-
-        r.groupEvents.forEach((ev, idx) => {
-          allEvents.push({
-            kind: "group",
-            ev,
-            date: ev.date,
-            orderIdx: idx
-          });
-        });
-
-        r.soloEvents.forEach((s, idx) => {
-          allEvents.push({
-            kind: "solo",
-            ev: s,
-            date: s.date,
-            orderIdx: 100 + idx
-          });
-        });
-
-        allEvents.sort((a, b) => {
-          const ka = dateKey(a.date);
-          const kb = dateKey(b.date);
-          if (ka !== kb) return ka - kb;
-          return a.orderIdx - b.orderIdx;
-        });
-
-        for (const entry of allEvents){
-          if (entry.kind === "group"){
-            const ev = entry.ev;
-
-            steps.push(async ()=>{
-              const line1 = `${ev.date}－${ev.item}`;
-              let line2 = "";
-              if (ev.type === "all"){
-                line2 = ev.note ?? `全體 +${ev.points}`;
-              }else if (ev.type === "allExcept"){
-                const names = (ev.except || []).map(findName).join("、");
-                line2 = ev.note ?? `除：${names} 其餘 +${ev.points}`;
-              }else if (ev.type === "only"){
-                const names = (ev.only || []).map(findName).join("、");
-                line2 = ev.note ?? `僅：${names} +${ev.points}`;
-              }else if (ev.type === "byMap"){
-                const cnt = Object.keys(ev.by || {}).length;
-                line2 = ev.note ?? `共 ${cnt} 位選手獲得不同步數`;
-              }
-
-              const {moveIds, stepsMap} = computeMove(ev);
-
-              showOverlay(`第 ${r.round} 回合`, [line1, line2], {
-  playersList: moveIds,
-  stepsMap: ev.type === "byMap" ? stepsMap : null
-});
-
-if (ev.fx === "angel"){
-  // ⭐ 等天使羽毛 + 魔法音效播完，再進下一段
-  await playAngelFx(moveIds);
-} else {
-  await sleep(900 / state.speed);
+    });
+  }else if (ev.type === "only"){
+    (ev.only || []).forEach(id=>{
+      moveIds.push(id);
+      stepsMap[id] = ev.points ?? 0;
+    });
+  }else if (ev.type === "byMap"){
+    Object.entries(ev.by || {}).forEach(([id, step])=>{
+      moveIds.push(id);
+      stepsMap[id] = step;
+    });
+  }
+  return {moveIds, stepsMap};
 }
 
-            });
+function buildStepsFromRounds(){
+  const steps = [];
+  state.roundStartStep = {};
 
-            steps.push(async ()=>{
-              const {moveIds, stepsMap} = computeMove(ev);
-              if (!moveIds.length){
-                showOverlay(`第 ${r.round} 回合`, ["（本項目無人移動）"]);
-                await sleep(550 / state.speed);
-                return;
-              }
-              showOverlay(`第 ${r.round} 回合`, ["選手前進中…"], {
-                playersList: moveIds
-              });
-              await moveMany(moveIds, stepsMap, {focusIds: moveIds});
-              await sleep(260 / state.speed);
-            });
+  for (const r of rounds){
+    state.roundStartStep[r.round] = steps.length;
 
-          } else {
-            const s = entry.ev;
-
-            const isCamelBonus = s.camelBonus === true;
-            const isCamelUse   = s.camelUse === true;
-            const reasonText   = s.reason || "提案審查通過";
-
-            if (isCamelBonus){
-              steps.push(async ()=>{
-                const whoName = findName(s.who);
-                const lines = [
-                  `${whoName}，${s.date}`,
-                  "準備抽卡…"
-                ];
-                showOverlay(`第 ${r.round} 回合`, lines, {
-                  showCard: true,
-                  cardText: "",
-                  flip: false,
-                  cardHint: "準備抽出前進卡",
-                  playersList: [s.who],
-                  badgeText: reasonText,
-                });
-                await sleep(900 / state.speed);
-              });
-
-              steps.push(async ()=>{
-  const whoName = findName(s.who);
-  showOverlay(`第 ${r.round} 回合`, [
-    `${whoName} 抽到「前進卡」！`
-  ], {
-    showCard: true,
-    cardText: "前進卡",
-    flip: true,
-    cardHint: "獲得前進卡",
-    playersList: [s.who],
-    badgeText: reasonText,
-  });
-
-  // ⭐ 直接等「櫻花雨＋魔法音效」結束
-  await playCardPetalsOnce();
-});
-
-
-                steps.push(async ()=>{
-                const whoName = findName(s.who);
-                showOverlay(`第 ${r.round} 回合`, [
-                  `${whoName} 獲得「前進卡」，可於之後使用。`,
-                  "本次停留原地。"
-                ]);                          // ← 不再帶 badgeText
-                await sleep(600 / state.speed);
-              });
-
-              continue;
-            }
-
-            else if (isCamelUse){
-  // ① 使用前進卡：翻卡＋櫻花
-steps.push(async ()=>{
-  const whoName = findName(s.who);
-
-  showOverlay(`第 ${r.round} 回合`, [
-    `${whoName} 使用先前保留的「前進卡」。`,
-    `這次將前進 ${s.card} 格！`
-  ], {
-    showCard: true,
-    cardText: `+${s.card}`,
-    flip: true,
-    cardHint: "使用前進卡",
-    playersList: [s.who],
-    badgeText: reasonText,
-  });
-
-  // ⭐ 等櫻花雨＋音效播完，再讓字幕往下走
-  await playCardPetalsOnce();
-  // 如果你要同時跑全畫面特效，也可以：
-  // await Promise.all([playCardPetalsOnce(), playCamelUseFx()]);
-});
-
-
-  // ② 使用前進卡後，選手實際前進中（這裡只移動，不再重翻卡）
-  steps.push(async ()=>{
-    const whoName = findName(s.who);
-    const moveIds  = [s.who];
-    const stepsMap = { [s.who]: s.card ?? 0 };
-
-    showOverlay(`第 ${r.round} 回合`, [
-      `${whoName} 使用前進卡，選手前進中…`
-    ], {
-      showCard: true,
-      cardText: `+${s.card}`,
-      flip: false,                   // 這裡不再翻卡，只維持卡面
-      cardHint: "使用前進卡",
-      playersList: [s.who],
-      badgeText: reasonText,
+    steps.push(async ()=>{
+      showOverlay(`第 ${r.round} 回合`, ["本回合開始"]);
+      await sleep(700 / state.speed);
     });
 
-    await moveMany(moveIds, stepsMap, { focusIds: moveIds });
-    await sleep(260 / state.speed);
-  });
-  continue;
-}
+    const allEvents = [];
 
+    r.groupEvents.forEach((ev, idx) => {
+      allEvents.push({ kind: "group", ev, date: ev.date, orderIdx: idx });
+    });
 
-            // 一般抽卡
-            steps.push(async ()=>{
-              const whoName = findName(s.who);
-              const lines = [
-                `${whoName}，${s.date}`,
-                s.note ? `備註：${s.note}` : "準備抽卡…"
-              ];
-              showOverlay(`第 ${r.round} 回合`, lines, {
-                showCard: true,
-                cardText: `+${s.card}`,
-                flip: false,
-                cardHint: "卡片尚未翻開",
-                playersList: [s.who],
-                badgeText: reasonText,
-              });
-              await sleep(900 / state.speed);
-            });
+    r.soloEvents.forEach((s, idx) => {
+      allEvents.push({ kind: "solo", ev: s, date: s.date, orderIdx: 100 + idx });
+    });
 
-            steps.push(async ()=>{
-              showOverlay(`第 ${r.round} 回合`, [
-                `${findName(s.who)} 抽卡結果：+${s.card}`
-              ], {
-                showCard: true,
-                cardText: `+${s.card}`,
-                flip: true,
-                cardHint: "抽卡結果",
-                playersList: [s.who],
-                badgeText: reasonText,
-              });
-              await sleep(850 / state.speed);
-            });
+    allEvents.sort((a, b) => {
+      const ka = dateKey(a.date);
+      const kb = dateKey(b.date);
+      if (ka !== kb) return ka - kb;
+      return a.orderIdx - b.orderIdx;
+    });
 
-                        steps.push(async ()=>{
-              showOverlay(`第 ${r.round} 回合`, [
-                `${findName(s.who)} 前進 ${s.card} 格`
-              ]);   // ← 拿掉 badgeText
-              await moveMany([s.who], {[s.who]: s.card}, {focusIds:[s.who]});
-              await sleep(300 / state.speed);
-            });
+    for (const entry of allEvents){
+      if (entry.kind === "group"){
+        const ev = entry.ev;
 
+        steps.push(async ()=>{
+          const line1 = `${ev.date}－${ev.item}`;
+          let line2 = "";
+          if (ev.type === "all"){
+            line2 = ev.note ?? `全體 +${ev.points}`;
+          }else if (ev.type === "allExcept"){
+            const names = (ev.except || []).map(findName).join("、");
+            line2 = ev.note ?? `除：${names} 其餘 +${ev.points}`;
+          }else if (ev.type === "only"){
+            const names = (ev.only || []).map(findName).join("、");
+            line2 = ev.note ?? `僅：${names} +${ev.points}`;
+          }else if (ev.type === "byMap"){
+            const cnt = Object.keys(ev.by || {}).length;
+            line2 = ev.note ?? `共 ${cnt} 位選手獲得不同步數`;
           }
+
+          const {moveIds, stepsMap} = computeMove(ev);
+
+          showOverlay(`第 ${r.round} 回合`, [line1, line2], {
+            playersList: moveIds,
+            stepsMap: ev.type === "byMap" ? stepsMap : null
+          });
+
+          if (ev.fx === "angel"){
+            await playAngelFx(moveIds);
+          } else {
+            await sleep(900 / state.speed);
+          }
+        });
+
+        steps.push(async ()=>{
+          const {moveIds, stepsMap} = computeMove(ev);
+          if (!moveIds.length){
+            showOverlay(`第 ${r.round} 回合`, ["（本項目無人移動）"]);
+            await sleep(550 / state.speed);
+            return;
+          }
+          showOverlay(`第 ${r.round} 回合`, ["選手前進中…"], { playersList: moveIds });
+          await moveMany(moveIds, stepsMap, {focusIds: moveIds});
+          await sleep(260 / state.speed);
+        });
+
+      } else {
+        const s = entry.ev;
+
+        const isCamelBonus = s.camelBonus === true;
+        const isCamelUse   = s.camelUse === true;
+        const reasonText   = s.reason || "提案審查通過";
+
+        if (isCamelBonus){
+          steps.push(async ()=>{
+            const whoName = findName(s.who);
+            showOverlay(`第 ${r.round} 回合`, [`${whoName}，${s.date}`, "準備抽卡…"], {
+              showCard: true, cardText: "", flip: false, cardHint: "準備抽出前進卡",
+              playersList: [s.who], badgeText: reasonText,
+            });
+            await sleep(900 / state.speed);
+          });
+
+          steps.push(async ()=>{
+            const whoName = findName(s.who);
+            showOverlay(`第 ${r.round} 回合`, [`${whoName} 抽到「前進卡」！`], {
+              showCard: true, cardText: "前進卡", flip: true, cardHint: "獲得前進卡",
+              playersList: [s.who], badgeText: reasonText,
+            });
+            await playCardPetalsOnce();
+          });
+
+          steps.push(async ()=>{
+            const whoName = findName(s.who);
+            showOverlay(`第 ${r.round} 回合`, [
+              `${whoName} 獲得「前進卡」，可於之後使用。`,
+              "本次停留原地。"
+            ]);
+            await sleep(600 / state.speed);
+          });
+
+          continue;
         }
 
-        // 回合結尾
+        if (isCamelUse){
+          steps.push(async ()=>{
+            const whoName = findName(s.who);
+            showOverlay(`第 ${r.round} 回合`, [
+              `${whoName} 使用先前保留的「前進卡」。`,
+              `這次將前進 ${s.card} 格！`
+            ], {
+              showCard: true, cardText: `+${s.card}`, flip: true, cardHint: "使用前進卡",
+              playersList: [s.who], badgeText: reasonText,
+            });
+            await playCardPetalsOnce();
+          });
+
+          steps.push(async ()=>{
+            const whoName = findName(s.who);
+            const moveIds  = [s.who];
+            const stepsMap = { [s.who]: s.card ?? 0 };
+
+            showOverlay(`第 ${r.round} 回合`, [`${whoName} 使用前進卡，選手前進中…`], {
+              showCard: true, cardText: `+${s.card}`, flip: false, cardHint: "使用前進卡",
+              playersList: [s.who], badgeText: reasonText,
+            });
+
+            await moveMany(moveIds, stepsMap, { focusIds: moveIds });
+            await sleep(260 / state.speed);
+          });
+
+          continue;
+        }
+
         steps.push(async ()=>{
-          if (state.finished){
-            showOverlay(`第 ${r.round} 回合結束`, [
-              `⚑ 已有選手抵達終點（${FINISH} 格）。`
-            ]);
-          }else{
-            showOverlay(`第 ${r.round} 回合結束`, ["更新即時排名…"]);
-          }
-          await sleep(800 / state.speed);
+          const whoName = findName(s.who);
+          const lines = [
+            `${whoName}，${s.date}`,
+            s.note ? `備註：${s.note}` : "準備抽卡…"
+          ];
+          showOverlay(`第 ${r.round} 回合`, lines, {
+            showCard: true, cardText: `+${s.card}`, flip: false, cardHint: "卡片尚未翻開",
+            playersList: [s.who], badgeText: reasonText,
+          });
+          await sleep(900 / state.speed);
+        });
+
+        steps.push(async ()=>{
+          showOverlay(`第 ${r.round} 回合`, [`${findName(s.who)} 抽卡結果：+${s.card}`], {
+            showCard: true, cardText: `+${s.card}`, flip: true, cardHint: "抽卡結果",
+            playersList: [s.who], badgeText: reasonText,
+          });
+          await sleep(850 / state.speed);
+        });
+
+        steps.push(async ()=>{
+          showOverlay(`第 ${r.round} 回合`, [`${findName(s.who)} 前進 ${s.card} 格`]);
+          await moveMany([s.who], {[s.who]: s.card}, {focusIds:[s.who]});
+          await sleep(300 / state.speed);
         });
       }
-
-      // 播放結束
-      steps.push(async ()=>{
-        const ordered = getOrderedPlayers();
-        const top = ordered[0];
-        showOverlay("播放結束", [
-          `第一名：${top.name}（🐾 ${state.pos[top.id]} 格）`
-        ]);
-      });
-
-      return steps;
     }
 
-    // ====== 播放控制 ======
-    let playing = false;
-    let cursor  = 0;
-
-    async function runAuto(){
-      if (playing) return;
-      playing = true;
-      btnStart.disabled = true;
-      btnNext.disabled  = true;
-      btnPrev.disabled  = true;
-
-      while (playing && cursor < state.stepQueue.length){
-        await state.stepQueue[cursor]();
-        cursor++;
+    steps.push(async ()=>{
+      if (state.finished){
+        showOverlay(`第 ${r.round} 回合結束`, [`⚑ 已有選手抵達終點（${FINISH} 格）。`]);
+      }else{
+        showOverlay(`第 ${r.round} 回合結束`, ["更新即時排名…"]);
       }
+      await sleep(800 / state.speed);
+    });
+  }
 
-      playing = false;
-      btnStart.disabled = false;
-      btnNext.disabled  = false;
-      btnPrev.disabled  = false;
-    }
+  steps.push(async ()=>{
+    const ordered = getOrderedPlayers();
+    const top = ordered[0];
+    showOverlay("播放結束", [`第一名：${top.name}（🐾 ${state.pos[top.id]} 格）`]);
+  });
 
-    async function runNext(){
-      if (cursor >= state.stepQueue.length) return;
-      btnNext.disabled = true;
-      btnPrev.disabled = true;
+  return steps;
+}
+
+// ====== 播放控制 ======
+let playing = false;
+let cursor  = 0;
+
+async function runAuto(){
+  if (playing) return;
+  playing = true;
+  btnStart.disabled = true;
+  btnNext.disabled  = true;
+  btnPrev.disabled  = true;
+
+  try {
+    while (playing && cursor < state.stepQueue.length){
       await state.stepQueue[cursor]();
       cursor++;
-      btnNext.disabled = false;
-      btnPrev.disabled = false;
     }
+  } catch (e) {
+    console.error("runAuto error:", e);
+  }
 
-    async function runToStep(target){
-      fastMode = true;
-      baseReset(false);
-      state.stepQueue = buildStepsFromRounds();
-      cursor = 0;
-      for (let i=0; i<target; i++){
-        await state.stepQueue[i]();
-        cursor = i+1;
-      }
-      fastMode = false;
-    }
+  playing = false;
+  btnStart.disabled = false;
+  btnNext.disabled  = false;
+  btnPrev.disabled  = false;
+}
 
-    async function runPrev(){
-      if (cursor <= 0) return;
-      const target = cursor - 1;
-      playing = false;
-      btnStart.disabled = true;
-      btnNext.disabled  = true;
-      btnPrev.disabled  = true;
-      await runToStep(target);
-      btnStart.disabled = false;
-      btnNext.disabled  = false;
-      btnPrev.disabled  = false;
-    }
+async function runNext(){
+  if (cursor >= state.stepQueue.length) return;
+  btnNext.disabled = true;
+  btnPrev.disabled = true;
 
-    // ====== 從指定「回合」開始播放 ======
-    async function jumpToRound(roundNumber){
-      playing = false;
+  try {
+    await state.stepQueue[cursor]();
+    cursor++;
+  } catch (e) {
+    console.error("runNext error:", e);
+  }
 
-      btnStart.disabled = true;
-      btnNext.disabled  = true;
-      btnPrev.disabled  = true;
+  btnNext.disabled = false;
+  btnPrev.disabled = false;
+}
 
-      baseReset(false);
-      state.stepQueue = buildStepsFromRounds();
+async function runToStep(target){
+  fastMode = true;
+  baseReset(false);
+  state.stepQueue = buildStepsFromRounds();
+  cursor = 0;
+  for (let i=0; i<target; i++){
+    await state.stepQueue[i]();
+    cursor = i+1;
+  }
+  fastMode = false;
+}
 
-      const map = state.roundStartStep || {};
-      const targetIndex = map[roundNumber];
+async function runPrev(){
+  if (cursor <= 0) return;
+  const target = cursor - 1;
+  playing = false;
+  btnStart.disabled = true;
+  btnNext.disabled  = true;
+  btnPrev.disabled  = true;
+  await runToStep(target);
+  btnStart.disabled = false;
+  btnNext.disabled  = false;
+  btnPrev.disabled  = false;
+}
 
-      if (typeof targetIndex !== "number"){
-        btnStart.disabled = false;
-        btnNext.disabled  = false;
-        btnPrev.disabled  = false;
-        return;
-      }
+async function jumpToRound(roundNumber){
+  playing = false;
 
-      fastMode = true;
-      for (let i = 0; i < targetIndex; i++){
-        await state.stepQueue[i]();
-        cursor = i + 1;
-      }
-      fastMode = false;
+  btnStart.disabled = true;
+  btnNext.disabled  = true;
+  btnPrev.disabled  = true;
 
-      btnStart.disabled = false;
-      btnNext.disabled  = false;
-      btnPrev.disabled  = false;
+  baseReset(false);
+  state.stepQueue = buildStepsFromRounds();
 
-      runAuto();
-    }
+  const map = state.roundStartStep || {};
+  const targetIndex = map[roundNumber];
 
-    function baseReset(showIntro = true){
-      playing = false;
-cursor  = 0;
-state.finished    = null;
-state.finishOrder = [];   // 🔹 清掉通關順序
+  if (typeof targetIndex !== "number"){
+    btnStart.disabled = false;
+    btnNext.disabled  = false;
+    btnPrev.disabled  = false;
+    return;
+  }
 
-celebratePlayed = false;
+  fastMode = true;
+  for (let i = 0; i < targetIndex; i++){
+    await state.stepQueue[i]();
+    cursor = i + 1;
+  }
+  fastMode = false;
 
-// ⭐ 清掉冠軍星星的定時器
+  btnStart.disabled = false;
+  btnNext.disabled  = false;
+  btnPrev.disabled  = false;
+
+  runAuto();
+}
+
+function baseReset(showIntro = true){
+  playing = false;
+  cursor  = 0;
+  state.finished    = null;
+  state.finishOrder = [];
+  celebratePlayed = false;
+
   if (winnerStarInterval){
     clearInterval(winnerStarInterval);
     winnerStarInterval = null;
   }
 
-      players.forEach(p => {
-        state.pos[p.id] = 0;
+  players.forEach(p => {
+    state.pos[p.id] = 0;
 
-        const lane   = document.querySelector(`.lane[data-id="${p.id}"]`);
-        const marker = document.getElementById(`marker-${p.id}`);
-        if (lane){
-          lane.classList.remove("winner","dim","focus");
-        }
-        if (marker){
-          marker.classList.remove("winner-marker");
-          const crown = marker.querySelector(".lane-crown");
-          if (crown){
-            crown.classList.remove("show");
-          }
-        }
-        if (marker){
-  marker.classList.remove("rivalry-hot");
+    const lane   = document.querySelector(`.lane[data-id="${p.id}"]`);
+    const marker = document.getElementById(`marker-${p.id}`);
+    if (lane){
+      lane.classList.remove("winner","dim","focus");
+    }
+    if (marker){
+      marker.classList.remove("winner-marker");
+      const crown = marker.querySelector(".lane-crown");
+      if (crown) crown.classList.remove("show");
+
+      marker.classList.remove("rivalry-hot");
+      marker.classList.remove("finished","star-power","rainbow-power");
+      const rocket = marker.querySelector(".lane-rocket");
+      if (rocket) rocket.remove();
+    }
+  });
+
+  updateAllProgress();
+  updateRank();
+  updateClearRank();
+
+  fireworksEl.style.display = "none";
+  fireworksEl.innerHTML = "";
+  itemFxEl.style.display = "none";
+  itemFxEl.innerHTML = "";
+
+  if (winnerBannerEl){
+    winnerBannerEl.classList.remove("show","fadeout");
+    winnerBannerEl.textContent = "";
+  }
+
+  if (showIntro){
+    showOverlay("準備開始", ["請按「開始播放」自動播放，或按「下一步」逐段查看。"]);
+  }
 }
 
-        if (marker){
-  // ✅ 清理「完成後狀態」相關視覺
-  marker.classList.remove("finished","star-power","rainbow-power");
-
-  const rocket = marker.querySelector(".lane-rocket");
-  if (rocket) rocket.remove();
-
-  // （你原本的 winner-marker/crown 清理保留）
+function resetAll(){
+  baseReset(true);
+  state.stepQueue = buildStepsFromRounds();
+  btnStart.disabled = false;
+  btnNext.disabled  = false;
+  btnPrev.disabled  = false;
 }
 
-      });
-
-      updateAllProgress();
-      updateRank();
-      updateClearRank();
-
-      fireworksEl.style.display = "none";
-      fireworksEl.innerHTML = "";
-      itemFxEl.style.display = "none";
-      itemFxEl.innerHTML = "";
-
-      if (winnerBannerEl){
-        winnerBannerEl.classList.remove("show","fadeout");
-        winnerBannerEl.textContent = "";
-      }
-
-      if (showIntro){
-        showOverlay("準備開始", [
-          "請按「開始播放」自動播放，或按「下一步」逐段查看。",
-        ]);
-      }
-    }
-
-    function resetAll(){
-      baseReset(true);
-      state.stepQueue = buildStepsFromRounds();
-      btnStart.disabled = false;
-      btnNext.disabled  = false;
-      btnPrev.disabled  = false;
-    }
-
-    // ====== 第一名慶祝：３秒冠軍橫幅 + 全螢幕煙火 ======
-    async function celebrateFinish(playerId){
+// ====== 第一名慶祝：７秒橫幅＋煙火＋celebrate，再切 finish BGM ======
+async function celebrateFinish(playerId){
   if (fastMode) return;
-  // ✅ 重要：冠軍慶祝期間，先停掉所有主 BGM（normal / nervous / finish）
   if (celebratePlayed) return;
   celebratePlayed = true;
+
   stopAllMainBgm();
   currentMainBgm = null;
 
@@ -4118,91 +3789,75 @@ celebratePlayed = false;
   const lane = document.querySelector(`.lane[data-id="${playerId}"]`);
   if (lane){
     lane.classList.add("winner");
-    burstWinnerStars(lane);   // 先噴一次，當作第一發
+    burstWinnerStars(lane);
 
-    // ⭐ 每隔一段時間重複噴星星
     if (!winnerStarInterval){
       winnerStarInterval = setInterval(() => {
-        // 如果這條賽道已經不在畫面上或不再是 winner，就自動停止
         if (!document.body.contains(lane) || !lane.classList.contains("winner")){
           clearInterval(winnerStarInterval);
           winnerStarInterval = null;
           return;
         }
         burstWinnerStars(lane);
-      }, 1600);   // 想更密可以調小一點
+      }, FX_CFG.winnerBurstInterval);
     }
   }
 
-      const marker = document.getElementById(`marker-${playerId}`);
-      if (marker){
-        marker.classList.add("winner-marker");
+  const marker = document.getElementById(`marker-${playerId}`);
+  if (marker){
+    marker.classList.add("winner-marker");
+    const crown = marker.querySelector(".lane-crown");
+    if (crown) crown.classList.add("show");
+  }
 
-        const crown = marker.querySelector(".lane-crown");
-        if (crown){
-          crown.classList.add("show");
-        }
-      }
+  if (winnerBannerEl){
+    winnerBannerEl.textContent = `🏆 第一名：${name}`;
+    winnerBannerEl.classList.remove("show","fadeout");
+    void winnerBannerEl.offsetWidth;
+    winnerBannerEl.classList.add("show");
+  }
 
-      if (winnerBannerEl){
-        winnerBannerEl.textContent = `🏆 第一名：${name}`;
-        winnerBannerEl.classList.remove("show","fadeout");
-        void winnerBannerEl.offsetWidth;
-        winnerBannerEl.classList.add("show");
-      }
+  const CELEBRATE_MS = FX_CFG.fireworksTotalMs;
 
-      // ✅ 讓煙火與橫幅停留「至少七秒」，配合 celebrate 播放時間
-const CELEBRATE_MS = 7000;
+  playFireworks(CELEBRATE_MS);
 
-// ✅ 播放煙火：建議也改成 7 秒，畫面才一致
-playFireworks(CELEBRATE_MS);
+  showOverlay("🏆 第一名出現！", [
+    `${name} 抵達第 ${FINISH} 格終點！`,
+    "賽道與即時排名已標記冠軍 👑。"
+  ]);
 
-showOverlay("🏆 第一名出現！", [
-  `${name} 抵達第 ${FINISH} 格終點！`,
-  "賽道與即時排名已標記冠軍 👑。"
-]);
+  await playCelebrate7sOnce();
+  await playMainBgm("finish");
 
-// ✅ 同步等待：celebrate 播七秒（不加速）
-// （這一行就是「畫面停住，等音效播完」的關鍵）
-await playCelebrate7sOnce();
+  await sleep(260);
 
-// ✅ celebrate 播完才切到 finish.mp3
-await playMainBgm("finish");
-
-// ✅ 你如果希望「切到 finish 的瞬間」橫幅才開始淡出，可以保留短暫停留
-// 例如停 200~400ms 讓切歌更有感
-await sleep(260);
-// ✅ 收橫幅：淡出 → 清字
-if (winnerBannerEl){
-  winnerBannerEl.classList.remove("show");
-  winnerBannerEl.classList.add("fadeout");
-
-  // 等淡出動畫跑完（這個時間要跟你的 CSS transition 對齊）
-  await sleep(420);
-
-  winnerBannerEl.classList.remove("fadeout");
-  winnerBannerEl.textContent = "";
+  if (winnerBannerEl){
+    winnerBannerEl.classList.remove("show");
+    winnerBannerEl.classList.add("fadeout");
+    await sleep(420);
+    winnerBannerEl.classList.remove("fadeout");
+    winnerBannerEl.textContent = "";
+  }
 }
 
-    }
-
-    // ====== 事件綁定 ======
-
-// ▶ 主播放按鈕：開始自動播放 + 啟動常駐 BGM
+// ====== 事件綁定（✅ 修正你原本 btnNext/btnPrev 的語法錯誤） ======
 btnStart.addEventListener("click", async ()=> {
-  await unlockAllAudio();          // ✅ 先解鎖所有音軌
-  await playMainBgm("normal");     // ✅ 再開始播 normal
+  await unlockAllAudio();
+  await playMainBgm("normal");
   runAuto();
 });
 
+btnNext.addEventListener("click", async ()=> {
+  await unlockAllAudio();
+  await runNext();
+});
 
-// ▶ 單步前進 / 後退：只控制動畫，不動音樂
-btnNext.addEventListener("click", ()=> runNext());
-btnPrev.addEventListener("click", ()=> runPrev());
+btnPrev.addEventListener("click", async ()=> {
+  await unlockAllAudio();
+  await runPrev();
+});
 
-// ▶ reset：重設賽道 + 重設音樂狀態 + 播回 normal
-btnReset.addEventListener("click", ()=> {
-  // 清掉所有 BGM 狀態
+btnReset.addEventListener("click", async ()=> {
   resetBgm();
   nervousStarted = false;
   finishStarted  = false;
@@ -4210,51 +3865,44 @@ btnReset.addEventListener("click", ()=> {
   rivalryEnded   = false;
   celebratePlayed = false;
 
-  // 重設賽道與動畫狀態
   resetAll();
-
-  // 回到常駐 BGM
+  await unlockAllAudio();
   playMainBgm("normal");
 });
 
-
-// ▶ 播放速度調整：跟原本一樣
 speedEl.addEventListener("input", ()=>{
   state.speed = Number(speedEl.value);
   speedTextEl.textContent = `${state.speed.toFixed(1)}x`;
 });
 
-// ▶ 從開場畫面直接開始播放
 splashStart.addEventListener("click", async ()=> {
   splash.style.display = "none";
   requestFitStage();
 
-  await unlockAllAudio();          // ✅ 先解鎖
-  await playMainBgm("normal");     // ✅ 再播 normal
-
+  await unlockAllAudio();
+  await playMainBgm("normal");
   await runAuto();
 });
 
-
-// ▶ 只關閉開場畫面，不播放（這裡不動音樂）
 splashLater.addEventListener("click", ()=> {
   splash.style.display = "none";
   requestFitStage();
 });
 
+// ====== 初始化 ======
+fitStage();
+buildLanes();
+updateRank();
+updateClearRank();
+state.stepQueue = buildStepsFromRounds();
+buildRoundJumpButtons();
 
-    // ====== 初始化 ======
-    fitStage();
-    buildLanes();
-    updateRank();
-    updateClearRank();
-    state.stepQueue = buildStepsFromRounds();
-    buildRoundJumpButtons();
-        showOverlay("準備開始", [
-      "主舞台：上方字幕卡、下方賽道。",
-      "右側：即時排名（中文名）。終點：46 格（第一個到達者 = 冠軍）。"
-    ]);
-  </script>
+showOverlay("準備開始", [
+  "主舞台：上方字幕卡、下方賽道。",
+  "右側：即時排名（中文名）。終點：46 格（第一個到達者 = 冠軍）。"
+]);
+</script>
+
   </div>
   </div>
 </body>
