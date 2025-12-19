@@ -2188,6 +2188,8 @@ let rivalryEnded   = false; // 第一個到 46 後變 true（永遠不再啟動�
 let nervousAt = null;  // 第一次進入 38 格以上的時間
 let finishAt  = null;  // 第一次進入 46 格以上的時間
 
+let celebratePlayed = false;  // ✅ 冠軍慶祝只跑一次的旗標
+
 // 小工具：暫停並歸零指定的 audio
 function stopAudio(a){
   if (!a) return;
@@ -4034,6 +4036,8 @@ cursor  = 0;
 state.finished    = null;
 state.finishOrder = [];   // 🔹 清掉通關順序
 
+celebratePlayed = false;
+
 // ⭐ 清掉冠軍星星的定時器
   if (winnerStarInterval){
     clearInterval(winnerStarInterval);
@@ -4255,4 +4259,3 @@ splashLater.addEventListener("click", ()=> {
   </div>
 </body>
 </html>
-
