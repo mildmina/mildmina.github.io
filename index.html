@@ -1881,20 +1881,21 @@ animation: winnerGlow 2200ms ease-in-out infinite;
   <!-- 道具特效 -->
   <div id="itemFx"></div>
 
-  <!-- 常駐 BGM -->
+  <!-- 常駐 BGM（開始就會用到） -->
 <audio id="bgm-normal"  src="music/normal.mp3"  preload="auto" loop></audio>
 
 <!-- 魔法特效用 -->
-<audio id="bgm-magic"   src="music/magic.mp3"   preload="auto"></audio>
+<audio id="bgm-magic"   src="music/magic.mp3"   preload="metadata"></audio>
 
 <!-- 緊張 BGM（38 格之後） -->
-<audio id="bgm-nervous" src="music/nervous.mp3" preload="auto" loop></audio>
+<audio id="bgm-nervous" src="music/nervous.mp3" preload="metadata" loop></audio>
 
-<!--慶祝 BGM(第一位選手產生時播到煙火結束) -->
-<audio id="bgm-celebrate" src="music/celebrate.mp3" preload="auto" loop></audio>
+<!-- 慶祝 BGM（程式播 7 秒就停，所以不要 loop） -->
+<audio id="bgm-celebrate" src="music/celebrate.mp3" preload="metadata"></audio>
 
-<!-- 終點 BGM（46 格後到播放結束） -->
-<audio id="bgm-finish"  src="music/finish.mp3"  preload="auto" loop></audio>
+<!-- 終點 BGM -->
+<audio id="bgm-finish"  src="music/finish.mp3"  preload="metadata" loop></audio>
+
 
 
   <script>
@@ -2155,34 +2156,63 @@ if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
 
 // ✅ iOS/Safari 需要：第一次互動解鎖音軌
 let audioUnlocked = false;
+let unlockingPromise = null;
 
-async function unlockAllAudio(){
-  if (audioUnlocked) return;
-  audioUnlocked = true;
+function unlockAllAudio(){
+  if (audioUnlocked) return Promise.resolve();
+  if (unlockingPromise) return unlockingPromise;
 
   const list = [audioNormal, audioMagic, audioNervous, audioCelebrate, audioFinish].filter(Boolean);
 
-  for (const a of list){
-    try {
-      a.muted = true;
-      a.volume = 0;
-      a.currentTime = 0;
-      await a.play();
-      a.pause();
-      a.currentTime = 0;
-      a.muted = false;
-    } catch (e){
-      console.warn("unlock audio failed:", a?.id, e);
-      try { a.pause(); a.currentTime = 0; a.muted = false; } catch(_){}
-    }
-  }
+  unlockingPromise = (async () => {
+    for (const a of list){
+      try {
+        // 防止任何 autoplay 造成解鎖後自己起播
+        try { a.autoplay = false; } catch(_){}
 
-  if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
-  if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
-  if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
-  if (audioMagic)   audioMagic.volume   = MAGIC_VOLUME;
-  if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
+        // 先停乾淨
+        try { a.pause(); } catch(_){}
+        try { a.currentTime = 0; } catch(_){}
+
+        // 靜音解鎖
+        a.muted = true;
+        a.volume = 0;
+
+        const p = a.play();
+        if (p) await p;
+
+        // 給瀏覽器一點點時間真正進入播放狀態再 pause（iOS 很常需要）
+        await new Promise(r => setTimeout(r, 30));
+
+        try { a.pause(); } catch(_){}
+        await new Promise(r => setTimeout(r, 0));
+        try { a.pause(); } catch(_){}
+
+        try { a.currentTime = 0; } catch(_){}
+      } catch (e){
+        console.warn("unlock audio failed:", a?.id, e);
+        try { a.pause(); a.currentTime = 0; } catch(_){}
+      } finally {
+        // ✅ 解鎖完成後恢復可聽狀態（但仍保持 pause）
+        try { a.muted = false; } catch(_){}
+      }
+    }
+
+    // 恢復音量設定
+    if (audioNormal)  audioNormal.volume  = BGM_VOLUME_BASE;
+    if (audioNervous) audioNervous.volume = BGM_VOLUME_BASE;
+    if (audioFinish)  audioFinish.volume  = BGM_VOLUME_BASE;
+    if (audioMagic)   audioMagic.volume   = MAGIC_VOLUME;
+    if (audioCelebrate) audioCelebrate.volume = BGM_VOLUME_BASE;
+
+    audioUnlocked = true;
+  })().finally(() => {
+    unlockingPromise = null;
+  });
+
+  return unlockingPromise;
 }
+
 // ✅ 只允許點「指定按鈕」才解鎖音訊（點空白不解鎖）
 (function setupAudioUnlockGate(){
   const ALLOW_SELECTORS = [
@@ -2191,26 +2221,37 @@ async function unlockAllAudio(){
     "#btnPrev",
     "#btnReset",
     "#splashStart",
-    ".round-jump-btn"   // 若你希望「跳回合」按鈕也能解鎖就留著
-    // 注意：不要放 #splashLater，避免按「稍後再播」也解鎖
+    ".round-jump-btn"
   ].join(",");
 
+  const opts = { capture:true, passive:true };
+  let gateDone = false;
+
   const handler = (ev) => {
-    if (audioUnlocked) return;
+    if (audioUnlocked || gateDone) return;
 
     const t = ev.target;
     if (!(t instanceof Element)) return;
-
-    // ✅ 不是點到指定按鈕（含按鈕內的子元素）→ 不解鎖
     if (!t.closest(ALLOW_SELECTORS)) return;
 
-    unlockAllAudio(); // 不用 await，避免卡住按鈕流程
+    gateDone = true;
+    unlockAllAudio(); // ✅ 只解鎖，不播音樂
+
+    // ✅ 解鎖一次後就移除監聽，避免多次觸發
+    if (window.PointerEvent){
+      document.removeEventListener("pointerdown", handler, opts);
+    }else{
+      document.removeEventListener("touchstart", handler, opts);
+    }
   };
 
-  document.addEventListener("pointerdown", handler, { capture:true, passive:true });
-  document.addEventListener("touchstart",  handler, { capture:true, passive:true });
+  // ✅ 避免 pointerdown + touchstart 兩次觸發：有 PointerEvent 就只用 pointerdown
+  if (window.PointerEvent){
+    document.addEventListener("pointerdown", handler, opts);
+  }else{
+    document.addEventListener("touchstart", handler, opts);
+  }
 })();
-
 
 // 目前的主 BGM： "normal" | "nervous" | "finish" | null
 let currentMainBgm = null;
